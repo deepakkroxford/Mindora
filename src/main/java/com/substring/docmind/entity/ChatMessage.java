@@ -1,0 +1,45 @@
+package com.substring.docmind.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(name = "chat_messages", indexes = {
+    @Index(name = "idx_conversation_id", columnList = "conversation_id"),
+    @Index(name = "idx_message_created_at", columnList = "created_at")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ChatMessage {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "conversation_id", nullable = false)
+    private Conversation conversation;
+
+    @Column(columnDefinition = "TEXT", nullable = false)
+    private String question;
+
+    @Column(columnDefinition = "TEXT")
+    private String answer;
+
+    @Column
+    private UUID documentId;
+
+    @Column
+    private Double similarityScore;
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+}
