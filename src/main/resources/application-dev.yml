@@ -6,6 +6,18 @@ spring:
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:postgres}
 
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -18,7 +30,7 @@ spring:
   #open ai configurations (OpenRouter)
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY}
+      api-key: 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
       base-url: https://openrouter.ai/api/v1
       chat:
         model: openrouter/auto

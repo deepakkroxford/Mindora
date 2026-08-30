@@ -1,51 +1,70 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Send, Bot, User, Loader2, ChevronDown, ChevronUp, FileText,
   Zap, Sparkles, RotateCcw, Square, Copy, Check, Wifi, WifiOff,
-  AlertTriangle, ThumbsUp, MoreHorizontal,
+  AlertTriangle, ThumbsUp, MoreHorizontal, MessageSquare, Globe,
+  HelpCircle, Lightbulb, Compass, FileCheck, BarChart3, Cpu, Target,
 } from 'lucide-react';
 import { chatApi } from '../services/api';
 import { useApp } from '../context/AppContext';
 import type { Message, CitationDto } from '../types';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
+import ChatAnalyticsModal from './ChatAnalyticsModal';
+
+/* ─── Default Welcome Message from Mindora AI ──────────────────── */
+const WELCOME_MESSAGE: Message = {
+  id: 'mindora-welcome-message',
+  role: 'assistant',
+  content: `👋 **Hi! I am Mindora AI Assistant**, your intelligent RAG companion for document analysis and research.
+
+I can help you extract insights, analyze data, and query your knowledge base in real-time. Here is what you can do:
+
+- 📄 **Contextual Document Q&A**: Ask detailed questions about any uploaded PDF, Word, CSV, Markdown, or Text file with source citations.
+- ⚡ **Real-Time Streaming**: Receive rapid, token-by-token answers backed by pgvector embeddings.
+- 🔍 **Semantic Vector Search**: Locate exact clauses, metrics, and definitions across documents.
+- 🧩 **Vector Chunks Explorer**: Inspect document chunking and metadata properties.
+
+💡 *To get started, select or upload a document from the sidebar, pick a prompt template below, or type your question!*`,
+  timestamp: new Date(),
+};
 
 /* ─── Prompt templates ──────────────────────────────────────────── */
 const PROMPT_TEMPLATES = [
   {
     category: 'Summarization',
     icon: '📋',
-    gradient: 'from-indigo-500/15 to-purple-500/15',
-    border: 'border-indigo-500/25',
-    accent: 'text-indigo-400',
+    gradient: 'from-teal-500/10 to-cyan-500/10',
+    border: 'border-teal-500/20 hover:border-teal-500/40',
+    accent: 'text-teal-400',
     templates: [
       { label: 'Executive Summary', prompt: 'Provide a concise executive summary of the key points in this document.' },
-      { label: 'Key Findings', prompt: 'What are the key findings and conclusions from this document?' },
+      { label: 'Key Findings', prompt: 'What are the key findings, metrics, and conclusions from this document?' },
       { label: 'Action Items', prompt: 'List all action items, tasks, and next steps mentioned in this document.' },
     ],
   },
   {
-    category: 'Legal & Compliance',
+    category: 'Legal & Risk Analysis',
     icon: '⚖️',
-    gradient: 'from-cyan-500/15 to-blue-500/15',
-    border: 'border-cyan-500/25',
+    gradient: 'from-cyan-500/10 to-blue-500/10',
+    border: 'border-cyan-500/20 hover:border-cyan-500/40',
     accent: 'text-cyan-400',
     templates: [
       { label: 'Key Clauses', prompt: 'What are the most important clauses and provisions in this document?' },
-      { label: 'Obligations', prompt: 'What obligations and responsibilities are defined in this document?' },
-      { label: 'Risk Analysis', prompt: 'Identify potential risks, liabilities, and red flags in this document.' },
+      { label: 'Obligations & Roles', prompt: 'What obligations, responsibilities, and liabilities are defined?' },
+      { label: 'Red Flags & Risks', prompt: 'Identify potential risks, caveats, and red flags in this document.' },
     ],
   },
   {
-    category: 'Analysis',
+    category: 'Insights & Data',
     icon: '🔍',
-    gradient: 'from-emerald-500/15 to-teal-500/15',
-    border: 'border-emerald-500/25',
+    gradient: 'from-emerald-500/10 to-teal-500/10',
+    border: 'border-emerald-500/20 hover:border-emerald-500/40',
     accent: 'text-emerald-400',
     templates: [
-      { label: 'Data Points', prompt: 'Extract all key data points, statistics, and metrics from this document.' },
-      { label: 'Definitions', prompt: 'List and explain all key terms and definitions used in this document.' },
-      { label: 'Timeline', prompt: 'Create a chronological timeline of all events and dates mentioned.' },
+      { label: 'Data Points & Stats', prompt: 'Extract all key numerical data points, statistics, and tables.' },
+      { label: 'Definitions', prompt: 'List and explain all key terms, acronyms, and definitions used.' },
+      { label: 'Timeline of Events', prompt: 'Create a chronological timeline of all events and milestones.' },
     ],
   },
 ];
@@ -59,10 +78,19 @@ function renderMarkdown(content: string): React.ReactNode[] {
   const renderInline = (text: string): React.ReactNode => {
     const parts = text.split(/(\*\*.*?\*\*|`.*?`|\*.*?\*|_.*?_)/g);
     return parts.map((part, j) => {
-      if (part.startsWith('**') && part.endsWith('**')) return <strong key={j} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
-      if (part.startsWith('*') && part.endsWith('*') && part.length > 2) return <em key={j} className="italic text-slate-300">{part.slice(1, -1)}</em>;
-      if (part.startsWith('_') && part.endsWith('_') && part.length > 2) return <em key={j} className="italic text-slate-300">{part.slice(1, -1)}</em>;
-      if (part.startsWith('`') && part.endsWith('`') && part.length > 2) return <code key={j} className="px-1.5 py-0.5 bg-[#0f172a] text-purple-300 rounded text-xs font-mono border border-[#334155]">{part.slice(1, -1)}</code>;
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={j} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+      }
+      if ((part.startsWith('*') && part.endsWith('*')) || (part.startsWith('_') && part.endsWith('_'))) {
+        if (part.length > 2) return <em key={j} className="italic text-slate-300">{part.slice(1, -1)}</em>;
+      }
+      if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+        return (
+          <code key={j} className="px-1.5 py-0.5 bg-[#0b0f19] text-teal-300 rounded-md text-xs font-mono border border-slate-800">
+            {part.slice(1, -1)}
+          </code>
+        );
+      }
       return part;
     });
   };
@@ -70,25 +98,55 @@ function renderMarkdown(content: string): React.ReactNode[] {
   while (i < lines.length) {
     const line = lines[i];
 
-    if (line.startsWith('### ')) { nodes.push(<h3 key={i} className="text-sm font-semibold text-white mt-3 mb-1">{renderInline(line.slice(4))}</h3>); i++; continue; }
-    if (line.startsWith('## '))  { nodes.push(<h2 key={i} className="text-base font-semibold text-white mt-3 mb-1">{renderInline(line.slice(3))}</h2>); i++; continue; }
-    if (line.startsWith('# '))   { nodes.push(<h1 key={i} className="text-lg font-bold text-white mt-3 mb-1">{renderInline(line.slice(2))}</h1>); i++; continue; }
-    if (line.startsWith('> '))   { nodes.push(<blockquote key={i} className="border-l-2 border-indigo-500 pl-3 text-slate-400 italic my-1">{renderInline(line.slice(2))}</blockquote>); i++; continue; }
-    if (line.startsWith('---'))  { nodes.push(<hr key={i} className="border-[#334155] my-2" />); i++; continue; }
+    if (line.startsWith('### ')) {
+      nodes.push(<h3 key={i} className="text-sm font-semibold text-white mt-3 mb-1">{renderInline(line.slice(4))}</h3>);
+      i++;
+      continue;
+    }
+    if (line.startsWith('## ')) {
+      nodes.push(<h2 key={i} className="text-base font-semibold text-white mt-3 mb-1">{renderInline(line.slice(3))}</h2>);
+      i++;
+      continue;
+    }
+    if (line.startsWith('# ')) {
+      nodes.push(<h1 key={i} className="text-lg font-bold text-white mt-3 mb-1">{renderInline(line.slice(2))}</h1>);
+      i++;
+      continue;
+    }
+    if (line.startsWith('> ')) {
+      nodes.push(<blockquote key={i} className="border-l-2 border-teal-500 pl-3 text-slate-400 italic my-1.5">{renderInline(line.slice(2))}</blockquote>);
+      i++;
+      continue;
+    }
+    if (line.startsWith('---')) {
+      nodes.push(<hr key={i} className="border-slate-800 my-3" />);
+      i++;
+      continue;
+    }
 
     // Code block
     if (line.startsWith('```')) {
-      const lang = line.slice(3);
+      const lang = line.slice(3).trim();
       const codeLines: string[] = [];
       i++;
-      while (i < lines.length && !lines[i].startsWith('```')) { codeLines.push(lines[i]); i++; }
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
       nodes.push(
-        <pre key={i} className="bg-[#0f172a] border border-[#334155] rounded-xl px-4 py-3 overflow-x-auto my-2">
-          {lang && <div className="text-[10px] text-slate-500 mb-1.5 uppercase font-mono">{lang}</div>}
-          <code className="text-xs text-slate-200 font-mono leading-relaxed whitespace-pre">{codeLines.join('\n')}</code>
-        </pre>
+        <div key={i} className="my-3 rounded-xl border border-slate-800 overflow-hidden bg-[#070b14]">
+          {lang && (
+            <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900/80 border-b border-slate-800 text-[10px] text-slate-400 font-mono uppercase tracking-wider">
+              <span>{lang}</span>
+            </div>
+          )}
+          <pre className="p-3.5 overflow-x-auto text-xs text-slate-200 font-mono leading-relaxed">
+            <code>{codeLines.join('\n')}</code>
+          </pre>
+        </div>
       );
-      i++; continue;
+      i++;
+      continue;
     }
 
     // Bullet list
@@ -98,7 +156,7 @@ function renderMarkdown(content: string): React.ReactNode[] {
         items.push(<li key={i}>{renderInline(lines[i].slice(2))}</li>);
         i++;
       }
-      nodes.push(<ul key={`ul-${i}`} className="list-disc list-inside space-y-0.5 ml-1 my-1 text-slate-200">{items}</ul>);
+      nodes.push(<ul key={`ul-${i}`} className="list-disc list-inside space-y-1 ml-1 my-1.5 text-slate-200 leading-relaxed">{items}</ul>);
       continue;
     }
 
@@ -109,12 +167,16 @@ function renderMarkdown(content: string): React.ReactNode[] {
         items.push(<li key={i}>{renderInline(lines[i].replace(/^\d+\. /, ''))}</li>);
         i++;
       }
-      nodes.push(<ol key={`ol-${i}`} className="list-decimal list-inside space-y-0.5 ml-1 my-1 text-slate-200">{items}</ol>);
+      nodes.push(<ol key={`ol-${i}`} className="list-decimal list-inside space-y-1 ml-1 my-1.5 text-slate-200 leading-relaxed">{items}</ol>);
       continue;
     }
 
-    if (line === '') { nodes.push(<div key={i} className="h-1.5" />); i++; continue; }
-    nodes.push(<p key={i} className="text-slate-200 leading-relaxed">{renderInline(line)}</p>);
+    if (line === '') {
+      nodes.push(<div key={i} className="h-1.5" />);
+      i++;
+      continue;
+    }
+    nodes.push(<p key={i} className="text-slate-200 leading-relaxed mb-2 last:mb-0">{renderInline(line)}</p>);
     i++;
   }
   return nodes;
@@ -125,40 +187,39 @@ const CitationCard: React.FC<{ citation: CitationDto; index: number }> = ({ cita
   const [expanded, setExpanded] = useState(false);
   const score = citation.similarityScore ?? 0;
   const pct = (score * 100).toFixed(0);
-  const barColor = score >= 0.8 ? 'bg-emerald-500' : score >= 0.6 ? 'bg-amber-500' : 'bg-red-500';
-  const textColor = score >= 0.8 ? 'text-emerald-400' : score >= 0.6 ? 'text-amber-400' : 'text-red-400';
-
-  const ext = citation.fileName?.split('.').pop()?.toLowerCase();
-  const extColors: Record<string, string> = { pdf: 'text-red-400', docx: 'text-blue-400', csv: 'text-green-400', md: 'text-purple-400' };
+  const barColor = score >= 0.8 ? 'bg-emerald-500' : score >= 0.6 ? 'bg-amber-500' : 'bg-rose-500';
+  const textColor = score >= 0.8 ? 'text-emerald-400' : score >= 0.6 ? 'text-amber-400' : 'text-rose-400';
 
   return (
-    <div className="border border-[#334155] rounded-xl overflow-hidden bg-[#0f172a] hover:border-[#475569] transition-colors">
+    <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-900/60 hover:border-slate-700 transition-all duration-150">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2.5 p-2.5 text-left"
+        className="w-full flex items-center gap-2.5 p-2.5 text-left hover:bg-slate-800/30 transition-colors"
       >
-        <span className="flex-shrink-0 w-5 h-5 bg-indigo-500/15 text-indigo-400 rounded-md text-xs flex items-center justify-center font-bold border border-indigo-500/20">
+        <span className="flex-shrink-0 w-5 h-5 bg-teal-500/15 text-teal-400 rounded-md text-[10px] flex items-center justify-center font-bold border border-teal-500/25">
           {index + 1}
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <FileText className={clsx('w-3 h-3 flex-shrink-0', extColors[ext ?? ''] ?? 'text-slate-400')} />
+            <FileText className="w-3 h-3 flex-shrink-0 text-teal-400" />
             <p className="text-xs text-slate-200 font-medium truncate">{citation.fileName}</p>
-            {citation.pageNumber && <span className="text-xs text-slate-500 flex-shrink-0">p.{citation.pageNumber}</span>}
+            {citation.pageNumber && (
+              <span className="text-[10px] text-slate-500 flex-shrink-0 bg-slate-800 px-1 rounded">p.{citation.pageNumber}</span>
+            )}
           </div>
-          {/* Similarity bar */}
+          {/* Similarity progress */}
           <div className="flex items-center gap-2 mt-1">
-            <div className="flex-1 h-1 bg-[#1e293b] rounded-full overflow-hidden">
-              <div className={clsx('h-1 rounded-full', barColor)} style={{ width: `${pct}%` }} />
+            <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
+              <div className={clsx('h-1 rounded-full transition-all duration-300', barColor)} style={{ width: `${pct}%` }} />
             </div>
-            <span className={clsx('text-[10px] font-bold flex-shrink-0', textColor)}>{pct}%</span>
+            <span className={clsx('text-[10px] font-bold flex-shrink-0 font-mono', textColor)}>{pct}%</span>
           </div>
         </div>
         {expanded ? <ChevronUp className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />}
       </button>
       {expanded && (
-        <div className="px-3 pb-3 pt-0 border-t border-[#1e293b] animate-fade-in">
-          <p className="text-xs text-slate-400 leading-relaxed mt-2">{citation.snippet}</p>
+        <div className="px-3 pb-3 pt-2 border-t border-slate-800 bg-[#070b14] animate-fade-in">
+          <p className="text-xs text-slate-300 leading-relaxed font-mono">{citation.snippet}</p>
         </div>
       )}
     </div>
@@ -170,7 +231,6 @@ const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
   const isUser = message.role === 'user';
   const [showCitations, setShowCitations] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [showTime, setShowTime] = useState(false);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
@@ -179,80 +239,107 @@ const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
     toast.success('Copied to clipboard');
   };
 
-  const timeStr = message.timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  if (isUser) {
+    return (
+      <div className="flex justify-end animate-fade-in group">
+        <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-xs bg-gradient-to-r from-teal-600 to-teal-500 text-white px-4 py-3 shadow-md shadow-teal-600/15">
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div
-      className={clsx('flex gap-3 group', isUser ? 'flex-row-reverse' : 'flex-row')}
-      onMouseEnter={() => setShowTime(true)}
-      onMouseLeave={() => setShowTime(false)}
-    >
-      {/* Avatar */}
-      <div className={clsx(
-        'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center shadow-sm mt-0.5',
-        isUser
-          ? 'bg-indigo-600 shadow-indigo-500/30'
-          : 'bg-gradient-to-br from-indigo-500 to-purple-600 shadow-indigo-500/30'
-      )}>
-        {isUser ? <User className="w-3.5 h-3.5 text-white" /> : <Bot className="w-3.5 h-3.5 text-white" />}
+    <div className="flex items-start gap-3 max-w-[95%] sm:max-w-[90%] animate-fade-in group">
+      {/* Bot Avatar */}
+      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-md shadow-teal-500/20 flex-shrink-0 mt-1">
+        <Bot className="w-4 h-4 text-white" />
       </div>
 
-      {/* Content */}
-      <div className={clsx('max-w-[78%] min-w-0', isUser ? 'items-end' : 'items-start')}>
-        <div className={clsx(
-          'rounded-2xl px-4 py-3 text-sm',
-          isUser
-            ? 'bg-indigo-600 text-white rounded-tr-sm shadow-sm shadow-indigo-500/20'
-            : 'bg-[#1e293b] border border-[#334155] rounded-tl-sm'
-        )}>
-          <div className="space-y-0.5">
-            {isUser
-              ? <p className="text-white leading-relaxed">{message.content}</p>
-              : renderMarkdown(message.content)
-            }
+      <div className="flex-1 min-w-0">
+        {/* Message Container Card */}
+        <div className="glass-card rounded-2xl p-4 border border-slate-800/80 bg-slate-900/60 shadow-sm relative">
+          <div className="prose">
+            {message.content ? (
+              renderMarkdown(message.content)
+            ) : message.isStreaming ? (
+              <div className="flex items-center gap-1.5 py-1">
+                <span className="text-xs text-slate-400">Analyzing documents</span>
+                <span className="cursor-blink" />
+              </div>
+            ) : null}
+            {message.isStreaming && message.content && <span className="cursor-blink" />}
           </div>
-          {/* Streaming cursor */}
-          {message.isStreaming && <span className="cursor-blink" />}
+
+          {/* Message Action Strip with Token & Similarity Telemetry */}
+          {!message.isStreaming && message.content && (
+            <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-800/60 text-[11px] text-slate-500 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {/* Latency */}
+                {message.responseTimeMs != null && (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-teal-400 bg-teal-500/10 border border-teal-500/20 px-1.5 py-0.5 rounded font-mono">
+                    <Zap className="w-2.5 h-2.5" />
+                    {message.responseTimeMs}ms
+                  </span>
+                )}
+
+                {/* Tokens Used */}
+                {message.totalTokens != null && (
+                  <span
+                    className="inline-flex items-center gap-1 text-[10px] text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded font-mono"
+                    title={`Prompt: ${message.promptTokens ?? 'N/A'} · Response: ${message.completionTokens ?? 'N/A'}`}
+                  >
+                    <Cpu className="w-2.5 h-2.5" />
+                    {message.totalTokens} tokens
+                  </span>
+                )}
+
+                {/* Similarity Score */}
+                {message.similarityScore != null && (
+                  <span
+                    className={clsx(
+                      'inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono border',
+                      message.similarityScore >= 0.8
+                        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                        : message.similarityScore >= 0.6
+                        ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                        : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                    )}
+                    title={`Cosine Vector Similarity: ${message.similarityScore.toFixed(4)}`}
+                  >
+                    <Target className="w-2.5 h-2.5" />
+                    {(message.similarityScore * 100).toFixed(0)}% match
+                  </span>
+                )}
+              </div>
+
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-1 text-slate-400 hover:text-slate-200 p-1 hover:bg-slate-800 rounded transition-colors"
+                title="Copy response"
+              >
+                {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copied ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Footer: citations + actions */}
-        <div className={clsx('flex items-center gap-2 mt-1.5', isUser ? 'justify-end' : 'justify-start')}>
-          {/* Timestamp */}
-          <span className={clsx('text-xs text-slate-600 transition-opacity', showTime ? 'opacity-100' : 'opacity-0')}>
-            {timeStr}
-          </span>
-
-          {!isUser && message.responseTimeMs && (
-            <span className="flex items-center gap-1 text-xs text-slate-600">
-              <Zap className="w-2.5 h-2.5" />{message.responseTimeMs}ms
-            </span>
-          )}
-
-          {/* Copy button (assistant only) */}
-          {!isUser && !message.isStreaming && message.content && (
-            <button
-              onClick={handleCopy}
-              className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-all"
-            >
-              {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
-            </button>
-          )}
-        </div>
-
-        {/* Citations */}
-        {!isUser && (message.citations?.length ?? 0) > 0 && !message.isStreaming && (
-          <div className="mt-2">
+        {/* Verified Citations Drawer */}
+        {message.citations && message.citations.length > 0 && (
+          <div className="mt-2 pl-1">
             <button
               onClick={() => setShowCitations(!showCitations)}
-              className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs text-teal-400 hover:text-teal-300 font-medium py-1 px-2.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/25 transition-all"
             >
-              <FileText className="w-3 h-3" />
-              {message.citations!.length} source{message.citations!.length > 1 ? 's' : ''}
+              <FileCheck className="w-3.5 h-3.5" />
+              <span>{message.citations.length} verified source{message.citations.length > 1 ? 's' : ''}</span>
               {showCitations ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             </button>
+
             {showCitations && (
-              <div className="mt-2 space-y-1.5 animate-fade-in">
-                {message.citations!.map((c, i) => (
+              <div className="mt-2 space-y-1.5 animate-fade-in max-w-xl">
+                {message.citations.map((c, i) => (
                   <CitationCard key={i} citation={c} index={i} />
                 ))}
               </div>
@@ -267,10 +354,10 @@ const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
 /* ─── Typing indicator ───────────────────────────────────────────── */
 const TypingIndicator = () => (
   <div className="flex gap-3 animate-fade-in">
-    <div className="w-8 h-8 flex-shrink-0 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-      <Bot className="w-3.5 h-3.5 text-white" />
+    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-md shadow-teal-500/20 flex-shrink-0">
+      <Bot className="w-4 h-4 text-white" />
     </div>
-    <div className="bg-[#1e293b] border border-[#334155] rounded-2xl rounded-tl-sm px-4 py-3">
+    <div className="glass-card bg-slate-900/60 border border-slate-800 rounded-2xl px-4 py-3">
       <div className="flex items-center gap-1 h-4">
         <div className="typing-dot" />
         <div className="typing-dot" />
@@ -284,18 +371,22 @@ const TypingIndicator = () => (
 const ChatView: React.FC = () => {
   const {
     selectedDocumentId,
+    setSelectedDocumentId,
     documents,
     selectedConversationId,
     setSelectedConversationId,
     fetchConversations,
+    conversations,
   } = useApp();
-  const [messages, setMessages] = useState<Message[]>([]);
+
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMode, setStreamingMode] = useState(true);
   const [conversationId, setConversationId] = useState<string | undefined>(selectedConversationId ?? undefined);
   const [showTemplates, setShowTemplates] = useState(true);
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -324,6 +415,10 @@ const ChatView: React.FC = () => {
                   id: m.id + '-a',
                   role: 'assistant',
                   content: m.answer,
+                  similarityScore: m.similarityScore,
+                  promptTokens: m.promptTokens,
+                  completionTokens: m.completionTokens,
+                  totalTokens: m.totalTokens,
                   timestamp: new Date(m.createdAt),
                 });
               }
@@ -334,6 +429,10 @@ const ChatView: React.FC = () => {
         .catch((err) => {
           console.error('Failed to load messages', err);
         });
+    } else {
+      setMessages([WELCOME_MESSAGE]);
+      setConversationId(undefined);
+      setShowTemplates(true);
     }
   }, [selectedConversationId]);
 
@@ -344,7 +443,6 @@ const ChatView: React.FC = () => {
   /* ── Stream handler ── */
   const sendStreaming = useCallback(async (question: string) => {
     const msgId = crypto.randomUUID();
-    // Add empty streaming assistant bubble
     setMessages((prev) => [
       ...prev,
       { id: msgId, role: 'assistant', content: '', isStreaming: true, timestamp: new Date() },
@@ -360,6 +458,7 @@ const ChatView: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'text/plain',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
@@ -389,12 +488,11 @@ const ChatView: React.FC = () => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
       }
 
-      // Mark done, then fetch citations in background
       setMessages((prev) =>
         prev.map((m) => m.id === msgId ? { ...m, isStreaming: false } : m)
       );
 
-      // Fetch citations from normal query endpoint
+      // Background citation & token lookup
       try {
         const citRes = await chatApi.query({
           question,
@@ -405,13 +503,22 @@ const ChatView: React.FC = () => {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === msgId
-              ? { ...m, citations: citRes.data.citations, responseTimeMs: citRes.data.responseTimeMs }
+              ? {
+                  ...m,
+                  citations: citRes.data.citations,
+                  responseTimeMs: citRes.data.responseTimeMs,
+                  similarityScore: citRes.data.similarityScore,
+                  promptTokens: citRes.data.promptTokens,
+                  completionTokens: citRes.data.completionTokens,
+                  totalTokens: citRes.data.totalTokens,
+                }
               : m
           )
         );
         if (citRes.data.conversationId) setConversationId(citRes.data.conversationId);
+        fetchConversations();
       } catch {
-        // citations failed silently — answer already shown
+        fetchConversations();
       }
 
     } catch (err: unknown) {
@@ -434,7 +541,7 @@ const ChatView: React.FC = () => {
       setIsStreaming(false);
       abortRef.current = null;
     }
-  }, [selectedDocumentId, conversationId]);
+  }, [selectedDocumentId, conversationId, fetchConversations]);
 
   /* ── Normal query handler ── */
   const sendNormal = useCallback(async (question: string) => {
@@ -454,10 +561,15 @@ const ChatView: React.FC = () => {
           content: res.data.answer,
           citations: res.data.citations,
           responseTimeMs: res.data.responseTimeMs,
+          similarityScore: res.data.similarityScore,
+          promptTokens: res.data.promptTokens,
+          completionTokens: res.data.completionTokens,
+          totalTokens: res.data.totalTokens,
           timestamp: new Date(),
         },
       ]);
       if (res.data.conversationId) setConversationId(res.data.conversationId);
+      fetchConversations();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Something went wrong';
       toast.error(msg);
@@ -468,7 +580,7 @@ const ChatView: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedDocumentId, conversationId]);
+  }, [selectedDocumentId, conversationId, fetchConversations]);
 
   /* ── Send dispatcher ── */
   const sendMessage = useCallback(async (question: string) => {
@@ -495,104 +607,80 @@ const ChatView: React.FC = () => {
   };
 
   const clearChat = () => {
-    setMessages([]);
+    setMessages([WELCOME_MESSAGE]);
     setConversationId(undefined);
+    setSelectedConversationId(null);
     setShowTemplates(true);
     abortRef.current?.abort();
   };
 
   const isBusy = isLoading || isStreaming;
-  const charCount = input.length;
 
   return (
-    <div className="flex flex-col h-full bg-[#0f172a]">
-      {/* ── Chat header ── */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-[#1e293b] flex-shrink-0 bg-[#111827]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <Sparkles className="w-3 h-3 text-white" />
-          </div>
-          <span className="text-sm font-semibold text-white">
-            {selectedDoc ? selectedDoc.filename : 'All Documents'}
-          </span>
-          {selectedDoc && (
-            <span className="text-[10px] font-semibold bg-indigo-500/15 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/25 uppercase tracking-wide">
-              Focused
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Streaming toggle */}
-          <button
-            onClick={() => setStreamingMode(!streamingMode)}
-            className={clsx(
-              'flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all',
-              streamingMode
-                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                : 'bg-[#1e293b] border-[#334155] text-slate-400 hover:text-white'
-            )}
-            title={streamingMode ? 'Streaming ON — click to disable' : 'Streaming OFF — click to enable'}
-          >
-            {streamingMode
-              ? <><Wifi className="w-3 h-3" /> Streaming</>
-              : <><WifiOff className="w-3 h-3" /> Normal</>}
-          </button>
-
-          {/* New chat */}
-          {messages.length > 0 && (
-            <button
-              onClick={clearChat}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white border border-[#334155] hover:border-[#475569] px-3 py-1.5 rounded-lg transition-colors"
-            >
-              <RotateCcw className="w-3 h-3" /> New chat
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── Messages area ── */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
-        {/* Welcome screen */}
-        {messages.length === 0 && showTemplates && (
-          <div className="animate-fade-in max-w-2xl mx-auto">
-            <div className="text-center mb-8">
-              <div className="relative inline-block mb-4">
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl blur-xl opacity-40" />
-                <div className="relative w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-500/30">
-                  <Bot className="w-8 h-8 text-white" />
-                </div>
+    <div className="flex flex-col h-full bg-[#0b0f19] relative overflow-hidden transition-colors">
+      {/* ── Messages Container ── */}
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* Welcome / Hero State */}
+        {showTemplates && messages.length <= 1 && (
+          <div className="animate-fade-in max-w-3xl mx-auto py-6">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-teal-500 to-cyan-500 shadow-xl shadow-teal-500/25 mb-4">
+                <Sparkles className="w-7 h-7 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">DocMind AI</h2>
-              <p className="text-slate-400 text-sm leading-relaxed max-w-sm mx-auto">
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2">
+                What can I analyze for you today?
+              </h2>
+              <p className="text-slate-400 text-sm max-w-md mx-auto leading-relaxed">
                 {selectedDoc
-                  ? `Chatting with "${selectedDoc.filename}". Ask anything or pick a template below.`
-                  : 'Ask questions across all your indexed documents, or select one from the sidebar.'}
+                  ? `Active focus on "${selectedDoc.filename}". Ask questions or pick a prompt below.`
+                  : `Ask questions across all ${documents.length} uploaded documents in your workspace.`}
               </p>
-              {streamingMode && (
-                <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">
-                  <Wifi className="w-3 h-3" /> Real-time streaming enabled
-                </div>
-              )}
+
+              {/* Scoped Context Chip */}
+              <div className="flex items-center justify-center gap-2 mt-4">
+                {selectedDoc ? (
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-xs text-teal-300">
+                    <FileText className="w-3.5 h-3.5 text-teal-400" />
+                    <span>Scoped to: <strong>{selectedDoc.filename}</strong></span>
+                    <button
+                      onClick={() => setSelectedDocumentId(null)}
+                      className="text-teal-400 hover:text-white ml-1 underline text-[10px]"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
+                    <Globe className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Searching across <strong>all {documents.length} documents</strong></span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Template grid */}
-            <div className="space-y-3">
+            {/* Prompt Template Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
               {PROMPT_TEMPLATES.map((cat) => (
-                <div key={cat.category} className={clsx('rounded-2xl border bg-gradient-to-br p-4', cat.gradient, cat.border)}>
+                <div
+                  key={cat.category}
+                  className={clsx(
+                    'rounded-2xl border bg-slate-900/40 p-4 transition-all duration-200',
+                    cat.border
+                  )}
+                >
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-base">{cat.icon}</span>
                     <h3 className={clsx('text-xs font-bold uppercase tracking-wider', cat.accent)}>{cat.category}</h3>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="space-y-2">
                     {cat.templates.map((t) => (
                       <button
                         key={t.label}
                         onClick={() => sendMessage(t.prompt)}
-                        className="text-left p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/8 hover:border-white/15 transition-all text-xs text-slate-200 hover:text-white group"
+                        className="w-full text-left p-2.5 rounded-xl bg-slate-800/50 hover:bg-teal-500/10 border border-slate-800 hover:border-teal-500/30 transition-all text-xs text-slate-300 hover:text-white group"
                       >
-                        <span className="font-medium block mb-0.5">{t.label}</span>
-                        <span className="text-slate-500 text-[10px] line-clamp-2 group-hover:text-slate-400 transition-colors">{t.prompt.slice(0, 55)}…</span>
+                        <span className="font-medium block text-slate-200 group-hover:text-teal-300 transition-colors mb-0.5">{t.label}</span>
+                        <span className="text-slate-500 text-[10px] line-clamp-1 group-hover:text-slate-400">{t.prompt}</span>
                       </button>
                     ))}
                   </div>
@@ -602,95 +690,144 @@ const ChatView: React.FC = () => {
           </div>
         )}
 
-        {/* Message list */}
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
-        ))}
+        {/* Message Thread */}
+        <div className="max-w-3xl mx-auto space-y-6">
+          {messages.map((msg) => (
+            <MessageBubble key={msg.id} message={msg} />
+          ))}
 
-        {/* Typing indicator (non-streaming mode) */}
-        {isLoading && !isStreaming && <TypingIndicator />}
+          {isLoading && !isStreaming && <TypingIndicator />}
+        </div>
 
         <div ref={bottomRef} />
       </div>
 
-      {/* ── Input area ── */}
-      <div className="px-6 py-4 border-t border-[#1e293b] flex-shrink-0 bg-[#111827]">
-        {/* Streaming status */}
-        {isStreaming && (
-          <div className="flex items-center gap-2 mb-2">
-            <div className="flex gap-0.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '100ms' }} />
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '200ms' }} />
+      {/* ── Floating Capsule Input Dock ── */}
+      <div className="p-4 bg-gradient-to-t from-[#0b0f19] via-[#0b0f19]/90 to-transparent flex-shrink-0">
+        <div className="max-w-3xl mx-auto">
+          <div className="glass-input rounded-3xl p-3 border border-slate-700/60 shadow-2xl shadow-black/40">
+            {/* Mini Toolbar */}
+            <div className="flex items-center justify-between pb-2 px-1 text-xs text-slate-400 border-b border-slate-800/60 mb-2 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                {selectedDoc ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-teal-300 bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded-md">
+                    <FileText className="w-3 h-3 text-teal-400" />
+                    <span className="truncate max-w-[140px]">{selectedDoc.filename}</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-md">
+                    <Globe className="w-3 h-3 text-slate-400" />
+                    <span>All Documents ({documents.length})</span>
+                  </span>
+                )}
+
+                {/* Streaming Pill Switch */}
+                <button
+                  onClick={() => setStreamingMode(!streamingMode)}
+                  className={clsx(
+                    'flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md transition-all',
+                    streamingMode
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                      : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                  )}
+                  title="Toggle streaming response"
+                >
+                  <Zap className="w-3 h-3" />
+                  <span>{streamingMode ? 'Streaming' : 'Batch'}</span>
+                </button>
+
+                {/* Analytics & Graph Button */}
+                <button
+                  onClick={() => setIsAnalyticsOpen(true)}
+                  className="flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-md bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 border border-teal-500/20 transition-all font-medium"
+                  title="View Token Usage & Similarity Graphs"
+                >
+                  <BarChart3 className="w-3 h-3 text-teal-400" />
+                  <span>Analytics & Graph</span>
+                </button>
+              </div>
+
+              {/* Clear conversation */}
+              {messages.length > 1 && (
+                <button
+                  onClick={clearChat}
+                  className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 p-0.5 hover:bg-slate-800 rounded transition-colors"
+                  title="Start new conversation"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span className="hidden sm:inline">New Chat</span>
+                </button>
+              )}
             </div>
-            <span className="text-xs text-emerald-400 font-medium">AI is responding…</span>
+
+            {/* Input Textarea + Action Button */}
+            <div className="flex items-end gap-2 px-1">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage(input);
+                  }
+                }}
+                placeholder={
+                  isBusy
+                    ? 'Mindora is generating response…'
+                    : selectedDoc
+                    ? `Ask anything about "${selectedDoc.filename}"…`
+                    : 'Ask any question across your document base…'
+                }
+                rows={1}
+                disabled={isBusy}
+                className="flex-1 bg-transparent text-sm text-slate-100 placeholder-slate-500 resize-none outline-none leading-relaxed disabled:opacity-60 max-h-32"
+                style={{ minHeight: '26px' }}
+                onInput={(e) => {
+                  const t = e.currentTarget;
+                  t.style.height = 'auto';
+                  t.style.height = `${Math.min(t.scrollHeight, 128)}px`;
+                }}
+              />
+
+              {/* Action Button */}
+              {isStreaming ? (
+                <button
+                  onClick={stopStream}
+                  className="flex-shrink-0 p-2.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-rose-400 rounded-full transition-all"
+                  title="Stop generation"
+                >
+                  <Square className="w-4 h-4 fill-current" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => sendMessage(input)}
+                  disabled={!input.trim() || isBusy}
+                  className="flex-shrink-0 p-2.5 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-full transition-all shadow-md shadow-teal-600/30 active:scale-95"
+                >
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </button>
+              )}
+            </div>
           </div>
-        )}
 
-        <div className={clsx(
-          'flex gap-3 items-end bg-[#1e293b] border rounded-2xl px-4 py-3 transition-all',
-          isBusy ? 'border-[#334155]' : 'border-[#334155] focus-within:border-indigo-500/50'
-        )}>
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
-            }}
-            placeholder={
-              isBusy ? 'Waiting for response…' :
-              selectedDoc ? `Ask about "${selectedDoc.filename}"…` :
-              'Ask a question about your documents…'
-            }
-            rows={1}
-            disabled={isBusy}
-            className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 resize-none outline-none leading-relaxed disabled:opacity-60"
-            style={{ minHeight: '24px', maxHeight: '144px' }}
-            onInput={(e) => {
-              const t = e.currentTarget;
-              t.style.height = 'auto';
-              t.style.height = `${Math.min(t.scrollHeight, 144)}px`;
-            }}
-          />
-
-          {/* Stop / Send button */}
-          {isStreaming ? (
-            <button
-              onClick={stopStream}
-              className="flex-shrink-0 p-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 rounded-xl transition-colors"
-              title="Stop generation"
-            >
-              <Square className="w-4 h-4" />
-            </button>
-          ) : (
-            <button
-              onClick={() => sendMessage(input)}
-              disabled={!input.trim() || isBusy}
-              className="flex-shrink-0 p-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-all shadow-sm shadow-indigo-500/25"
-            >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </button>
-          )}
-        </div>
-
-        {/* Footer hint */}
-        <div className="flex items-center justify-between mt-2 px-1">
-          <p className="text-[11px] text-slate-600">
-            Enter to send · Shift+Enter for new line
-          </p>
-          <div className="flex items-center gap-2">
-            {charCount > 0 && (
-              <span className={clsx('text-[11px]', charCount > 1000 ? 'text-amber-500' : 'text-slate-600')}>
-                {charCount}
-              </span>
-            )}
-            {messages.length > 0 && (
-              <span className="text-[11px] text-slate-600">{messages.length} msgs</span>
-            )}
+          <div className="flex items-center justify-between mt-1.5 px-3 text-[10px] text-slate-500">
+            <span>Press Enter to send · Shift+Enter for new line</span>
+            {messages.length > 1 && <span>{messages.length} messages</span>}
           </div>
         </div>
       </div>
+
+      {/* ── Visual Analytics & Token Graph Modal ── */}
+      <ChatAnalyticsModal
+        isOpen={isAnalyticsOpen}
+        onClose={() => setIsAnalyticsOpen(false)}
+        messages={messages}
+        conversationTitle={
+          conversations.find((c) => c.id === conversationId)?.title ||
+          (selectedDoc ? selectedDoc.filename : 'Workspace Chat')
+        }
+      />
     </div>
   );
 };

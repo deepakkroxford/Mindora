@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  FileText, Trash2, ChevronDown, ChevronUp,
-  CheckCircle, Clock, AlertCircle, Loader2,
-  Upload, RefreshCw, X, FileType, FilePieChart, File,
-  FolderOpen,
+  Brain, MessageSquare, Search, Layers, Plus, Upload, Trash2, ChevronDown, ChevronUp,
+  CheckCircle, Clock, AlertCircle, Loader2, X, FileType, FilePieChart, FileText, File,
+  FolderOpen, Sun, Moon, LogOut, Sparkles, Filter, Check, PanelLeftClose,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
+import { useNavigate } from 'react-router-dom';
 import type { DocumentMetadataDto, DocumentStatus } from '../types';
 import { clsx } from 'clsx';
+import toast from 'react-hot-toast';
 
 interface SidebarProps {
   onUploadClick: () => void;
@@ -24,10 +26,10 @@ function formatDate(dateStr: string): string {
 }
 
 function getFileEmoji(contentType: string): React.ReactNode {
-  if (contentType.includes('pdf')) return <FileText className="w-4 h-4 text-red-400" />;
-  if (contentType.includes('word') || contentType.includes('docx')) return <FileType className="w-4 h-4 text-blue-400" />;
-  if (contentType.includes('csv')) return <FilePieChart className="w-4 h-4 text-green-400" />;
-  return <File className="w-4 h-4 text-slate-400" />;
+  if (contentType.includes('pdf')) return <FileText className="w-4 h-4 text-rose-400" />;
+  if (contentType.includes('word') || contentType.includes('docx')) return <FileType className="w-4 h-4 text-sky-400" />;
+  if (contentType.includes('csv')) return <FilePieChart className="w-4 h-4 text-emerald-400" />;
+  return <File className="w-4 h-4 text-teal-400" />;
 }
 
 const STATUS_CONFIG: Record<DocumentStatus, { icon: React.ReactNode; color: string; dot: string; label: string }> = {
@@ -45,14 +47,14 @@ const STATUS_CONFIG: Record<DocumentStatus, { icon: React.ReactNode; color: stri
   },
   UPLOADING: {
     icon: <Clock className="w-3 h-3" />,
-    color: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
-    dot: 'bg-blue-400 animate-pulse',
+    color: 'text-sky-400 bg-sky-400/10 border-sky-400/20',
+    dot: 'bg-sky-400 animate-pulse',
     label: 'Uploading',
   },
   FAILED: {
     icon: <AlertCircle className="w-3 h-3" />,
-    color: 'text-red-400 bg-red-400/10 border-red-400/20',
-    dot: 'bg-red-400',
+    color: 'text-rose-400 bg-rose-400/10 border-rose-400/20',
+    dot: 'bg-rose-400',
     label: 'Failed',
   },
 };
@@ -60,7 +62,7 @@ const STATUS_CONFIG: Record<DocumentStatus, { icon: React.ReactNode; color: stri
 const StatusBadge: React.FC<{ status: DocumentStatus }> = ({ status }) => {
   const cfg = STATUS_CONFIG[status];
   return (
-    <span className={clsx('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border', cfg.color)}>
+    <span className={clsx('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border', cfg.color)}>
       {cfg.icon}
       {cfg.label}
     </span>
@@ -68,7 +70,7 @@ const StatusBadge: React.FC<{ status: DocumentStatus }> = ({ status }) => {
 };
 
 const DocumentItem: React.FC<{ doc: DocumentMetadataDto }> = ({ doc }) => {
-  const { selectedDocumentId, setSelectedDocumentId, deleteDocument } = useApp();
+  const { selectedDocumentId, setSelectedDocumentId, deleteDocument, setIsSidebarOpen } = useApp();
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const isSelected = selectedDocumentId === doc.id;
@@ -86,81 +88,93 @@ const DocumentItem: React.FC<{ doc: DocumentMetadataDto }> = ({ doc }) => {
   return (
     <div
       className={clsx(
-        'rounded-xl border transition-all duration-200 overflow-hidden',
+        'rounded-xl border transition-all duration-200 overflow-hidden group',
         isSelected
-          ? 'border-indigo-500/60 bg-indigo-500/8 shadow-sm shadow-indigo-500/10'
-          : 'border-[#334155] bg-[#1e293b]/50 hover:border-[#475569]'
+          ? 'border-teal-500/60 bg-teal-500/10 shadow-sm shadow-teal-500/10 ring-1 ring-teal-500/30'
+          : 'border-slate-800 bg-slate-900/60 hover:border-slate-700 hover:bg-slate-800/50'
       )}
     >
       {/* Main row */}
       <div
-        className="flex items-start gap-2.5 p-3 cursor-pointer"
-        onClick={() => setSelectedDocumentId(isSelected ? null : doc.id)}
+        className="flex items-start gap-2.5 p-2.5 cursor-pointer"
+        onClick={() => {
+          setSelectedDocumentId(isSelected ? null : doc.id);
+          if (window.innerWidth < 768) {
+            setIsSidebarOpen(false);
+          }
+        }}
       >
         <div className={clsx(
           'p-1.5 rounded-lg flex-shrink-0 mt-0.5 transition-colors',
-          isSelected ? 'bg-indigo-500/20' : 'bg-[#0f172a]'
+          isSelected ? 'bg-teal-500/20 text-teal-300' : 'bg-slate-800 text-slate-400 group-hover:text-slate-200'
         )}>
           {getFileEmoji(doc.contentType)}
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-white font-medium truncate leading-tight" title={doc.filename}>
-            {doc.filename}
-          </p>
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          <div className="flex items-center justify-between gap-1">
+            <p className="text-xs font-semibold text-slate-100 truncate leading-tight" title={doc.filename}>
+              {doc.filename}
+            </p>
+            {isSelected && (
+              <span className="text-[9px] font-bold uppercase tracking-wider text-teal-400 bg-teal-500/15 border border-teal-500/30 px-1.5 py-0.2 rounded-full">
+                Active
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
             <StatusBadge status={doc.status} />
-            <span className="text-xs text-slate-500">{formatBytes(doc.fileSize)}</span>
+            <span className="text-[11px] text-slate-500">{formatBytes(doc.fileSize)}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
           <button
             onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-            className="p-1 hover:bg-[#334155] rounded-lg transition-colors"
+            className="p-1 hover:bg-slate-700/60 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
+            title={expanded ? 'Collapse details' : 'Expand details'}
           >
-            {expanded
-              ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-              : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+            {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); handleDelete(); }}
             className={clsx(
               'p-1 rounded-lg transition-all text-xs',
               confirmDelete
-                ? 'bg-red-500/20 text-red-400 px-2 font-medium'
-                : 'hover:bg-red-500/10 hover:text-red-400 text-slate-400'
+                ? 'bg-rose-500/20 text-rose-400 px-1.5 font-medium border border-rose-500/30'
+                : 'opacity-0 group-hover:opacity-100 hover:bg-rose-500/15 hover:text-rose-400 text-slate-500'
             )}
+            title="Delete document"
           >
-            {confirmDelete ? 'Sure?' : <Trash2 className="w-3.5 h-3.5" />}
+            {confirmDelete ? 'Confirm?' : <Trash2 className="w-3.5 h-3.5" />}
           </button>
         </div>
       </div>
 
       {/* Expanded info */}
       {expanded && (
-        <div className="px-3 pb-3 border-t border-[#334155]/60">
-          <div className="grid grid-cols-3 gap-1.5 mt-2.5">
+        <div className="px-3 pb-3 pt-1 border-t border-slate-800 bg-slate-950/40 animate-fade-in">
+          <div className="grid grid-cols-3 gap-1.5 mt-1.5">
             {doc.totalChunks != null && (
-              <div className="bg-[#0f172a] rounded-lg p-2 text-center">
-                <p className="text-lg font-bold text-indigo-400">{doc.totalChunks}</p>
-                <p className="text-xs text-slate-500">chunks</p>
+              <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-1.5 text-center">
+                <p className="text-sm font-bold text-teal-400">{doc.totalChunks}</p>
+                <p className="text-[10px] text-slate-500">chunks</p>
               </div>
             )}
             {doc.totalPages != null && (
-              <div className="bg-[#0f172a] rounded-lg p-2 text-center">
-                <p className="text-lg font-bold text-slate-200">{doc.totalPages}</p>
-                <p className="text-xs text-slate-500">pages</p>
+              <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-1.5 text-center">
+                <p className="text-sm font-bold text-slate-200">{doc.totalPages}</p>
+                <p className="text-[10px] text-slate-500">pages</p>
               </div>
             )}
-            <div className="bg-[#0f172a] rounded-lg p-2 text-center">
-              <p className="text-sm font-semibold text-slate-200">{formatDate(doc.createdAt)}</p>
-              <p className="text-xs text-slate-500">added</p>
+            <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-1.5 text-center">
+              <p className="text-xs font-semibold text-slate-300">{formatDate(doc.createdAt)}</p>
+              <p className="text-[10px] text-slate-500">uploaded</p>
             </div>
           </div>
           {doc.errorMessage && (
-            <div className="mt-2 px-2 py-1.5 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <p className="text-xs text-red-400">{doc.errorMessage}</p>
+            <div className="mt-2 px-2 py-1.5 bg-rose-500/10 border border-rose-500/20 rounded-lg">
+              <p className="text-[11px] text-rose-400 leading-snug">{doc.errorMessage}</p>
             </div>
           )}
         </div>
@@ -173,7 +187,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onUploadClick }) => {
   const {
     documents,
     isLoadingDocuments,
-    fetchDocuments,
     selectedDocumentId,
     setSelectedDocumentId,
     isSidebarOpen,
@@ -183,158 +196,327 @@ const Sidebar: React.FC<SidebarProps> = ({ onUploadClick }) => {
     setSelectedConversationId,
     deleteConversation,
     fetchConversations,
+    activeTab,
+    setActiveTab,
   } = useApp();
 
+  const { isDark, toggleTheme } = useTheme();
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<'documents' | 'history'>('documents');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const indexedCount = documents.filter((d) => d.status === 'INDEXED').length;
+  // Retrieve user info from storage
+  const user = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    toast.success('Logged out successfully');
+    navigate('/login');
+  };
+
+  const handleNewChat = () => {
+    setSelectedConversationId(null);
+    setActiveTab('chat');
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  };
+
+  const filteredDocuments = useMemo(() => {
+    if (!searchQuery.trim()) return documents;
+    return documents.filter((d) => d.filename.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [documents, searchQuery]);
+
+  const filteredConversations = useMemo(() => {
+    if (!searchQuery.trim()) return conversations;
+    return conversations.filter((c) => c.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [conversations, searchQuery]);
+
+  const navItems = [
+    { id: 'chat' as const, label: 'Chat Assistant', icon: MessageSquare, badge: null },
+    { id: 'search' as const, label: 'Semantic Search', icon: Search, badge: null },
+    { id: 'chunks' as const, label: 'Vector Chunks', icon: Layers, badge: documents.length > 0 ? `${documents.length}` : null },
+  ];
 
   return (
-    <aside
-      className={clsx(
-        'flex flex-col h-full bg-[#111827] border-r border-[#1e293b] transition-all duration-300 flex-shrink-0',
-        isSidebarOpen ? 'w-72' : 'w-0 overflow-hidden'
-      )}
-    >
-      {/* Navigation tabs for Sidebar */}
-      <div className="flex items-center border-b border-[#1e293b] bg-[#0f172a] p-1.5 gap-1 flex-shrink-0">
-        <button
-          onClick={() => setActiveSection('documents')}
-          className={clsx(
-            'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition',
-            activeSection === 'documents'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-slate-200'
-          )}
-        >
-          <FolderOpen className="w-3.5 h-3.5" />
-          <span>Documents ({documents.length})</span>
-        </button>
-        <button
-          onClick={() => {
-            setActiveSection('history');
-            fetchConversations();
-          }}
-          className={clsx(
-            'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition',
-            activeSection === 'history'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-slate-200'
-          )}
-        >
-          <Clock className="w-3.5 h-3.5" />
-          <span>History ({conversations.length})</span>
-        </button>
-        <button
+    <>
+      {/* Mobile Drawer Backdrop */}
+      {isSidebarOpen && (
+        <div
           onClick={() => setIsSidebarOpen(false)}
-          className="p-1 hover:bg-[#1e293b] rounded-lg transition text-slate-400"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
-      </div>
+          className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300"
+        />
+      )}
 
-      {activeSection === 'documents' ? (
-        <>
-          {/* Upload CTA */}
-          <div className="p-3 border-b border-[#1e293b] flex-shrink-0">
+      <aside
+        className={clsx(
+          'flex flex-col bg-[#0b0f19] border-r border-slate-800/80 transition-all duration-300 z-50',
+          // Desktop behavior: relative layout with fixed height
+          'md:relative md:h-full md:translate-x-0',
+          // Mobile behavior: drawer layout
+          'fixed inset-y-0 left-0 h-full',
+          isSidebarOpen ? 'w-80 translate-x-0 shadow-2xl md:shadow-none' : '-translate-x-full md:translate-x-0 md:w-0 md:border-r-0 overflow-hidden'
+        )}
+      >
+        {/* ── 1. Top Brand Header ── */}
+        <div className="flex items-center justify-between px-4 h-14 border-b border-slate-800/70 flex-shrink-0 bg-[#0f172a]/50">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-md shadow-teal-500/25">
+              <Brain className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold tracking-tight text-white">Mindora</span>
+                <span className="text-[9px] font-bold text-teal-400 bg-teal-500/10 border border-teal-500/25 px-1.5 py-0.2 rounded-full uppercase tracking-wider">
+                  RAG
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-500 leading-none mt-0.5">Document Intelligence</p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsSidebarOpen(false)}
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+            title="Close sidebar"
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* ── 2. "+ New Chat" Action ── */}
+        <div className="p-3 border-b border-slate-800/60 flex-shrink-0">
+          <button
+            onClick={handleNewChat}
+            className="w-full group relative flex items-center justify-between px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-cyan-500 text-white text-sm font-semibold shadow-lg shadow-teal-600/25 hover:shadow-teal-500/35 transition-all active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-2">
+              <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
+              <span>New Conversation</span>
+            </div>
+            <Sparkles className="w-3.5 h-3.5 text-teal-200 opacity-75 group-hover:opacity-100 animate-pulse" />
+          </button>
+        </div>
+
+        {/* ── 3. Main Navigation Switcher ── */}
+        <div className="px-3 py-2 border-b border-slate-800/60 flex-shrink-0 space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  if (window.innerWidth < 768) setIsSidebarOpen(false);
+                }}
+                className={clsx(
+                  'w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150',
+                  isActive
+                    ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                )}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Icon className={clsx('w-4 h-4', isActive ? 'text-teal-400' : 'text-slate-400')} />
+                  <span>{item.label}</span>
+                </div>
+                {item.badge && (
+                  <span className="text-[10px] bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded-md text-slate-400 font-mono">
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── 4. Sub-Section Tabs (Documents / History) ── */}
+        <div className="px-3 pt-3 flex-shrink-0">
+          <div className="flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl">
             <button
-              onClick={onUploadClick}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30"
+              onClick={() => { setActiveSection('documents'); setSearchQuery(''); }}
+              className={clsx(
+                'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all',
+                activeSection === 'documents'
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              )}
             >
-              <Upload className="w-4 h-4" />
-              Upload Documents
+              <FolderOpen className="w-3.5 h-3.5" />
+              <span>Docs ({documents.length})</span>
+            </button>
+            <button
+              onClick={() => {
+                setActiveSection('history');
+                setSearchQuery('');
+                fetchConversations();
+              }}
+              className={clsx(
+                'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all',
+                activeSection === 'history'
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              )}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>History ({conversations.length})</span>
             </button>
           </div>
 
-          {/* Active filter chip */}
-          {selectedDocumentId && (
-            <div className="px-3 py-2 flex-shrink-0 border-b border-[#1e293b]/60">
+          {/* Quick search input */}
+          <div className="mt-2 relative">
+            <Search className="w-3 h-3 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={activeSection === 'documents' ? 'Search documents…' : 'Search chat sessions…'}
+              className="w-full pl-7 pr-3 py-1.5 text-xs bg-slate-900/80 border border-slate-800 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-500/50 transition-colors"
+            />
+            {searchQuery && (
               <button
-                onClick={() => setSelectedDocumentId(null)}
-                className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 px-3 py-1 rounded-full transition-all w-full justify-center"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
               >
                 <X className="w-3 h-3" />
-                Clear document filter
               </button>
-            </div>
-          )}
-
-          {/* Doc list */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {isLoadingDocuments ? (
-              <div className="flex flex-col items-center justify-center h-32 gap-2">
-                <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
-                <p className="text-xs text-slate-500">Loading documents…</p>
-              </div>
-            ) : documents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-52 text-center px-4">
-                <div className="w-12 h-12 bg-[#1e293b] rounded-xl flex items-center justify-center mb-3">
-                  <FileText className="w-6 h-6 text-slate-600" />
-                </div>
-                <p className="text-sm text-slate-400 font-medium">No documents yet</p>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  Upload PDF, DOCX, TXT, MD or CSV files to get started
-                </p>
-                <button
-                  onClick={onUploadClick}
-                  className="mt-4 text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-2 transition-colors"
-                >
-                  Upload your first document →
-                </button>
-              </div>
-            ) : (
-              documents.map((doc) => <DocumentItem key={doc.id} doc={doc} />)
             )}
           </div>
-        </>
-      ) : (
-        /* History Section */
+        </div>
+
+        {/* ── 5. Scrollable Library List ── */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {conversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-52 text-center px-4">
-              <div className="w-12 h-12 bg-[#1e293b] rounded-xl flex items-center justify-center mb-3">
-                <Clock className="w-6 h-6 text-slate-600" />
-              </div>
-              <p className="text-sm text-slate-400 font-medium">No chat history yet</p>
-              <p className="text-xs text-slate-500 mt-1">Start asking questions in the chat window to save sessions here.</p>
-            </div>
-          ) : (
-            conversations.map((conv) => {
-              const isSelected = selectedConversationId === conv.id;
-              return (
-                <div
-                  key={conv.id}
-                  onClick={() => setSelectedConversationId(conv.id)}
-                  className={clsx(
-                    'p-3 rounded-xl border cursor-pointer transition flex items-start justify-between gap-2',
-                    isSelected
-                      ? 'border-indigo-500/60 bg-indigo-500/10'
-                      : 'border-[#334155] bg-[#1e293b]/50 hover:border-[#475569]'
-                  )}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-slate-100 truncate">{conv.title}</p>
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      {conv.messageCount} msg{conv.messageCount !== 1 ? 's' : ''} · {formatDate(conv.updatedAt)}
-                    </p>
-                  </div>
+          {activeSection === 'documents' ? (
+            <>
+              {/* Document upload CTA button */}
+              <button
+                onClick={onUploadClick}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 border border-dashed border-slate-700/80 hover:border-teal-500/50 bg-slate-900/40 hover:bg-teal-500/5 rounded-xl text-xs text-slate-400 hover:text-teal-300 transition-all group"
+              >
+                <Upload className="w-3.5 h-3.5 text-slate-500 group-hover:text-teal-400 transition-colors" />
+                <span>Upload New Files</span>
+              </button>
+
+              {/* Active document scope banner */}
+              {selectedDocumentId && (
+                <div className="px-2 py-1.5 bg-teal-500/10 border border-teal-500/30 rounded-xl flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-teal-300 font-medium truncate">Filter active</span>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteConversation(conv.id);
-                    }}
-                    className="p-1 text-slate-500 hover:text-red-400 hover:bg-[#334155] rounded-lg transition"
-                    title="Delete chat session"
+                    onClick={() => setSelectedDocumentId(null)}
+                    className="text-[10px] text-teal-400 hover:text-white underline underline-offset-2 flex-shrink-0"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    Clear
                   </button>
                 </div>
-              );
-            })
+              )}
+
+              {/* Document list */}
+              {isLoadingDocuments ? (
+                <div className="flex flex-col items-center justify-center h-28 gap-2">
+                  <Loader2 className="w-5 h-5 text-teal-400 animate-spin" />
+                  <p className="text-xs text-slate-500">Loading documents…</p>
+                </div>
+              ) : filteredDocuments.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-36 text-center px-4">
+                  <p className="text-xs text-slate-400 font-medium">No documents found</p>
+                  <p className="text-[11px] text-slate-500 mt-1">Upload PDF, DOCX, TXT, MD or CSV files.</p>
+                </div>
+              ) : (
+                filteredDocuments.map((doc) => <DocumentItem key={doc.id} doc={doc} />)
+              )}
+            </>
+          ) : (
+            /* History Section */
+            <>
+              {filteredConversations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-36 text-center px-4">
+                  <p className="text-xs text-slate-400 font-medium">No chat history yet</p>
+                  <p className="text-[11px] text-slate-500 mt-1">Start a conversation to save past queries.</p>
+                </div>
+              ) : (
+                filteredConversations.map((conv) => {
+                  const isSelected = selectedConversationId === conv.id;
+                  return (
+                    <div
+                      key={conv.id}
+                      onClick={() => {
+                        setSelectedConversationId(conv.id);
+                        setActiveTab('chat');
+                        if (window.innerWidth < 768) setIsSidebarOpen(false);
+                      }}
+                      className={clsx(
+                        'p-2.5 rounded-xl border cursor-pointer transition-all duration-150 flex items-start justify-between gap-2 group',
+                        isSelected
+                          ? 'border-teal-500/60 bg-teal-500/10 text-white'
+                          : 'border-slate-800 bg-slate-900/50 text-slate-300 hover:border-slate-700 hover:bg-slate-800/50'
+                      )}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium truncate group-hover:text-white transition-colors">{conv.title}</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">
+                          {conv.messageCount} msg{conv.messageCount !== 1 ? 's' : ''} · {formatDate(conv.updatedAt)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteConversation(conv.id);
+                        }}
+                        className="p-1 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                        title="Delete chat session"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </>
           )}
         </div>
-      )}
-    </aside>
+
+        {/* ── 6. Bottom User Profile Footer ── */}
+        <div className="p-3 border-t border-slate-800/80 flex-shrink-0 bg-[#0f172a]/60">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-teal-500 to-cyan-500 flex items-center justify-center text-white text-xs font-bold shadow-sm shadow-teal-500/30 flex-shrink-0">
+                {user?.name ? user.name[0].toUpperCase() : 'U'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-slate-200 truncate">{user?.name || 'User'}</p>
+                <p className="text-[10px] text-slate-500 truncate">{user?.email || 'Logged in'}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button
+                onClick={toggleTheme}
+                className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+                title={isDark ? 'Switch to Light mode' : 'Switch to Dark mode'}
+              >
+                {isDark ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-teal-400" />}
+              </button>
+              <button
+                onClick={handleLogout}
+                className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors"
+                title="Logout"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 };
 

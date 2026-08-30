@@ -1,8 +1,10 @@
 package com.substring.docmind.service;
 
+import com.substring.docmind.dto.ForgotPasswordRequestDto;
 import com.substring.docmind.dto.LoginRequestDto;
 import com.substring.docmind.dto.LoginResponseDto;
 import com.substring.docmind.dto.RegisterRequestDto;
+import com.substring.docmind.dto.ResetPasswordRequestDto;
 import com.substring.docmind.entity.User;
 import com.substring.docmind.exception.ErrorCode;
 import com.substring.docmind.repository.UserRepository;
@@ -23,6 +25,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final EmailService emailService;
 
     /**
      * Login user and return JWT token
@@ -108,5 +111,57 @@ public class AuthService {
 
         log.info("Token refreshed for user: {}", email);
         return LoginResponseDto.fromUser(newToken, user.getEmail(), user.getName(), user.getRole(), expiresIn);
+    }
+
+    /**
+     * Trigger forgot password flow: generate 6-digit OTP, store it with expiry, and send email
+     */
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequestDto request) {
+        log.info("Password reset request for email: {}", request.getEmail());
+        
+        User user = userRepository.findByEmail(request.getEmail())
+            .orElseThrow(() -> new IllegalArgumentException("User with this email does not exist"));
+
+        // Generate 6-digit OTP
+        int otpCode = 100000 + new java.util.Random().nextInt(900000);
+        String otp = String.valueOf(otpCode);
+        
+        user.setResetToken(otp);
+        user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(10)); // valid for 10 minutes
+        userRepository.save(user);
+
+        emailService.sendOtpEmail(user.getEmail(), otp);
+    }
+
+    /**
+     * Reset password: check OTP matching & expiry, verify password match, and save hashed password
+     */
+    @Transactional
+    public void resetPassword(ResetPasswordRequestDto request) {
+        log.info("Resetting password for email: {}", request.getEmail());
+        
+        if (!request.passwordsMatch()) {
+            throw new IllegalArgumentException("Passwords do not match");
+        }
+
+        User user = userRepository.findByEmail(request.getEmail())
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (user.getResetToken() == null || !user.getResetToken().equals(request.getOtp())) {
+            throw new IllegalArgumentException("Invalid OTP code");
+        }
+
+        if (user.getResetTokenExpiry() == null || user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("OTP code has expired");
+        }
+
+        // Update password and clear reset token info
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setResetToken(null);
+        user.setResetTokenExpiry(null);
+        userRepository.save(user);
+        
+        log.info("Password successfully reset for user: {}", request.getEmail());
     }
 }

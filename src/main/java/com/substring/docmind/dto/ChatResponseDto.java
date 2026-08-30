@@ -14,4 +14,8 @@ public class ChatResponseDto {
     private String conversationId;
     private List<CitationDto> citations;
     private Long responseTimeMs;
+    private Double similarityScore;
+    private Integer promptTokens;
+    private Integer completionTokens;
+    private Integer totalTokens;
 }
