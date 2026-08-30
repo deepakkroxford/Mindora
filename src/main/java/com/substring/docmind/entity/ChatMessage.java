@@ -39,6 +39,15 @@ public class ChatMessage {
     @Column
     private Double similarityScore;
 
+    @Column
+    private Integer promptTokens;
+
+    @Column
+    private Integer completionTokens;
+
+    @Column
+    private Integer totalTokens;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

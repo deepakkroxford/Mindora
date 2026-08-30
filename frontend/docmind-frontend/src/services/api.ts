@@ -12,6 +12,8 @@ import type {
   RegisterRequestDto,
   SearchRequestDto,
   SearchResultDto,
+  ForgotPasswordRequestDto,
+  ResetPasswordRequestDto,
 } from '../types';
 
 const api = axios.create({
@@ -56,6 +58,16 @@ export const authApi = {
 
   refresh: async (): Promise<ApiResponse<LoginResponseDto>> => {
     const { data } = await api.post<ApiResponse<LoginResponseDto>>('/auth/refresh');
+    return data;
+  },
+
+  forgotPassword: async (request: ForgotPasswordRequestDto): Promise<ApiResponse<void>> => {
+    const { data } = await api.post<ApiResponse<void>>('/auth/forgot-password', request);
+    return data;
+  },
+
+  resetPassword: async (request: ResetPasswordRequestDto): Promise<ApiResponse<void>> => {
+    const { data } = await api.post<ApiResponse<void>>('/auth/reset-password', request);
     return data;
   },
 };

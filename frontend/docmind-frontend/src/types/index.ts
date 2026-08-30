@@ -54,6 +54,10 @@ export interface ChatResponseDto {
   conversationId: string;
   citations: CitationDto[];
   responseTimeMs: number;
+  similarityScore?: number | null;
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
 }
 
 export interface SearchRequestDto {
@@ -90,6 +94,18 @@ export interface LoginResponseDto {
   expiresIn: number;
 }
 
+export interface ForgotPasswordRequestDto {
+  email: string;
+}
+
+export interface ResetPasswordRequestDto {
+  email: string;
+  otp: string;
+  newPassword?: string;
+  confirmPassword?: string;
+}
+
+
 export interface ConversationDto {
   id: string;
   title: string;
@@ -106,6 +122,9 @@ export interface ChatMessageDto {
   answer: string;
   documentId: string | null;
   similarityScore: number | null;
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
   createdAt: string;
 }
 
@@ -116,6 +135,10 @@ export interface Message {
   content: string;
   citations?: CitationDto[];
   responseTimeMs?: number;
+  similarityScore?: number | null;
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
   timestamp: Date;
   isStreaming?: boolean;
 }

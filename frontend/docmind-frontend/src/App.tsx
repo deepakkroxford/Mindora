@@ -12,6 +12,7 @@ import ChunksView from './components/ChunksView';
 import UploadDialog from './components/UploadDialog';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 
 const ProtectedLayout: React.FC = () => {
   const token = localStorage.getItem('token');
@@ -23,14 +24,14 @@ const ProtectedLayout: React.FC = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#0f172a] text-slate-100">
+    <div className="flex flex-col h-screen overflow-hidden bg-[#0b0f19] text-slate-100">
       <Navbar onUploadClick={() => setIsUploadOpen(true)} />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         <Sidebar onUploadClick={() => setIsUploadOpen(true)} />
 
         {/* Main content */}
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-hidden relative flex flex-col min-w-0 bg-[#0b0f19]">
           {activeTab === 'chat' && <ChatView />}
           {activeTab === 'search' && <SearchView />}
           {activeTab === 'chunks' && <ChunksView />}
@@ -51,6 +52,7 @@ const App: React.FC = () => {
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/*" element={<ProtectedLayout />} />
             </Routes>
           </BrowserRouter>

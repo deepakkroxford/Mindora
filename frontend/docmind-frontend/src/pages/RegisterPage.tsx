@@ -45,7 +45,7 @@ const RegisterPage: React.FC = () => {
     <div className="flex items-center justify-center min-h-screen bg-slate-900 text-slate-100 p-4">
       <div className="bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-xl w-full max-w-md">
         <div className="flex flex-col items-center mb-6">
-          <div className="w-12 h-12 bg-gradient-to-tr from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center text-white text-2xl font-bold mb-3 shadow-lg shadow-blue-500/20">
+          <div className="w-12 h-12 bg-gradient-to-tr from-indigo-600 to-cyan-500 rounded-xl flex items-center justify-center text-white text-2xl font-bold mb-3 shadow-lg shadow-indigo-500/20">
             D
           </div>
           <h1 className="text-3xl font-bold text-slate-100">Create Account</h1>
@@ -58,7 +58,7 @@ const RegisterPage: React.FC = () => {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500 transition"
+              className="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500 transition"
               placeholder="John Doe"
               required
             />
@@ -69,7 +69,7 @@ const RegisterPage: React.FC = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500 transition"
+              className="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500 transition"
               placeholder="you@example.com"
               required
             />
@@ -80,7 +80,7 @@ const RegisterPage: React.FC = () => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500 transition"
+              className="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500 transition"
               placeholder="At least 8 characters"
               required
               minLength={8}
@@ -92,7 +92,7 @@ const RegisterPage: React.FC = () => {
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500 transition"
+              className="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500 transition"
               placeholder="Re-enter password"
               required
             />
@@ -100,14 +100,14 @@ const RegisterPage: React.FC = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-xl shadow-lg shadow-blue-600/30 transition disabled:opacity-50 mt-2"
+            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition disabled:opacity-50 mt-2"
           >
             {loading ? 'Registering...' : 'Create Account'}
           </button>
         </form>
         <p className="text-center mt-6 text-sm text-slate-400">
           Already have an account?{' '}
-          <Link to="/login" className="text-blue-400 hover:text-blue-300 font-medium">
+          <Link to="/login" className="text-indigo-400 hover:text-indigo-300 font-medium">
             Sign In
           </Link>
         </p>

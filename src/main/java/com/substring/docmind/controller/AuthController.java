@@ -68,4 +68,26 @@ public class AuthController {
             .timestamp(LocalDateTime.now())
             .build());
     }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Request password reset OTP", description = "Generates and emails a 6-digit OTP to user")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequestDto request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+            .success(true)
+            .message("OTP has been sent to your email")
+            .timestamp(LocalDateTime.now())
+            .build());
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset password using OTP", description = "Verifies OTP and updates user password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequestDto request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+            .success(true)
+            .message("Password has been reset successfully")
+            .timestamp(LocalDateTime.now())
+            .build());
+    }
 }
