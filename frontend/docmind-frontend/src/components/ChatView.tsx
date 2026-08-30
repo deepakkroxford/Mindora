@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
   Send, Bot, User, Loader2, ChevronDown, ChevronUp, FileText,
   Zap, Sparkles, RotateCcw, Square, Copy, Check, Wifi, WifiOff,
-  AlertTriangle, ThumbsUp, MoreHorizontal, MessageSquare, Globe,
+  AlertTriangle, ThumbsUp, ThumbsDown, MoreHorizontal, MessageSquare, Globe,
   HelpCircle, Lightbulb, Compass, FileCheck, BarChart3, Cpu, Target,
+  Download, FileCode, Edit2,
 } from 'lucide-react';
 import { chatApi } from '../services/api';
 import { useApp } from '../context/AppContext';
@@ -227,10 +228,24 @@ const CitationCard: React.FC<{ citation: CitationDto; index: number }> = ({ cita
 };
 
 /* ─── Message bubble ────────────────────────────────────────────── */
-const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
+interface MessageBubbleProps {
+  message: Message;
+  isLastAssistant?: boolean;
+  onRegenerate?: (msg: Message) => void;
+  onEditPrompt?: (text: string) => void;
+}
+
+const MessageBubble: React.FC<MessageBubbleProps> = ({
+  message,
+  isLastAssistant,
+  onRegenerate,
+  onEditPrompt,
+}) => {
   const isUser = message.role === 'user';
+  const isWelcome = message.id === 'mindora-welcome-message';
   const [showCitations, setShowCitations] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
@@ -239,9 +254,36 @@ const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
     toast.success('Copied to clipboard');
   };
 
+  const handleFeedback = (type: 'like' | 'dislike') => {
+    if (feedback === type) {
+      setFeedback(null);
+    } else {
+      setFeedback(type);
+      toast.success(type === 'like' ? 'Thanks for your feedback!' : 'Feedback noted. We will keep improving!');
+    }
+  };
+
   if (isUser) {
     return (
-      <div className="flex justify-end animate-fade-in group">
+      <div className="flex items-center justify-end gap-1.5 animate-fade-in group">
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {onEditPrompt && (
+            <button
+              onClick={() => onEditPrompt(message.content)}
+              className="p-1 text-slate-400 hover:text-teal-400 hover:bg-slate-800/80 rounded-lg transition-colors"
+              title="Edit and retry question"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <button
+            onClick={handleCopy}
+            className="p-1 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-lg transition-colors"
+            title="Copy question"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+        </div>
         <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-xs bg-gradient-to-r from-teal-600 to-teal-500 text-white px-4 py-3 shadow-md shadow-teal-600/15">
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
         </div>
@@ -313,14 +355,53 @@ const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
                 )}
               </div>
 
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-1 text-slate-400 hover:text-slate-200 p-1 hover:bg-slate-800 rounded transition-colors"
-                title="Copy response"
-              >
-                {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
-              </button>
+              {/* Action Buttons: Feedback, Retry, Copy */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {!isWelcome && (
+                  <>
+                    <button
+                      onClick={() => handleFeedback('like')}
+                      className={clsx(
+                        'p-1 rounded transition-colors',
+                        feedback === 'like' ? 'text-teal-400 bg-teal-500/20' : 'text-slate-500 hover:text-teal-400 hover:bg-slate-800'
+                      )}
+                      title="Helpful response"
+                    >
+                      <ThumbsUp className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => handleFeedback('dislike')}
+                      className={clsx(
+                        'p-1 rounded transition-colors',
+                        feedback === 'dislike' ? 'text-rose-400 bg-rose-500/20' : 'text-slate-500 hover:text-rose-400 hover:bg-slate-800'
+                      )}
+                      title="Unhelpful response"
+                    >
+                      <ThumbsDown className="w-3 h-3" />
+                    </button>
+
+                    {onRegenerate && (
+                      <button
+                        onClick={() => onRegenerate(message)}
+                        className="flex items-center gap-1 text-slate-400 hover:text-teal-400 p-1 hover:bg-slate-800 rounded transition-colors"
+                        title="Regenerate answer"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span className="hidden sm:inline">Regenerate</span>
+                      </button>
+                    )}
+                  </>
+                )}
+
+                <button
+                  onClick={handleCopy}
+                  className="flex items-center gap-1 text-slate-400 hover:text-slate-200 p-1 hover:bg-slate-800 rounded transition-colors"
+                  title="Copy response"
+                >
+                  {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <span>{copied ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -387,6 +468,7 @@ const ChatView: React.FC = () => {
   const [conversationId, setConversationId] = useState<string | undefined>(selectedConversationId ?? undefined);
   const [showTemplates, setShowTemplates] = useState(true);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -492,33 +574,14 @@ const ChatView: React.FC = () => {
         prev.map((m) => m.id === msgId ? { ...m, isStreaming: false } : m)
       );
 
-      // Background citation & token lookup
+      // Refresh conversation list and maintain conversationId for conversational memory
       try {
-        const citRes = await chatApi.query({
-          question,
-          documentId: selectedDocumentId ?? undefined,
-          topK: 5,
-          conversationId,
-        });
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === msgId
-              ? {
-                  ...m,
-                  citations: citRes.data.citations,
-                  responseTimeMs: citRes.data.responseTimeMs,
-                  similarityScore: citRes.data.similarityScore,
-                  promptTokens: citRes.data.promptTokens,
-                  completionTokens: citRes.data.completionTokens,
-                  totalTokens: citRes.data.totalTokens,
-                }
-              : m
-          )
-        );
-        if (citRes.data.conversationId) setConversationId(citRes.data.conversationId);
-        fetchConversations();
-      } catch {
-        fetchConversations();
+        const convList = await fetchConversations();
+        if (!conversationId && convList && convList.length > 0) {
+          setConversationId(convList[0].id);
+        }
+      } catch (e) {
+        console.error('Failed to sync conversation after streaming', e);
       }
 
     } catch (err: unknown) {
@@ -602,6 +665,43 @@ const ChatView: React.FC = () => {
     inputRef.current?.focus();
   }, [isLoading, isStreaming, streamingMode, sendStreaming, sendNormal]);
 
+  /* ── Regenerate response ── */
+  const handleRegenerate = useCallback(async (msg: Message) => {
+    if (isLoading || isStreaming) return;
+    const msgIndex = messages.findIndex((m) => m.id === msg.id);
+    let previousQuestion = '';
+    for (let i = msgIndex - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        previousQuestion = messages[i].content;
+        break;
+      }
+    }
+    if (!previousQuestion && messages.length > 1) {
+      const userMsgs = messages.filter((m) => m.role === 'user');
+      if (userMsgs.length > 0) previousQuestion = userMsgs[userMsgs.length - 1].content;
+    }
+    if (!previousQuestion) return;
+
+    // Remove the message to regenerate
+    setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+
+    if (streamingMode) {
+      await sendStreaming(previousQuestion);
+    } else {
+      await sendNormal(previousQuestion);
+    }
+  }, [isLoading, isStreaming, messages, streamingMode, sendStreaming, sendNormal]);
+
+  /* ── Edit prompt handler ── */
+  const handleEditPrompt = useCallback((promptText: string) => {
+    setInput(promptText);
+    if (inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.style.height = 'auto';
+      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 160)}px`;
+    }
+  }, []);
+
   const stopStream = () => {
     abortRef.current?.abort();
   };
@@ -611,7 +711,93 @@ const ChatView: React.FC = () => {
     setConversationId(undefined);
     setSelectedConversationId(null);
     setShowTemplates(true);
+    setShowExportMenu(false);
     abortRef.current?.abort();
+  };
+
+  /* ── 1-Click Export Handlers ── */
+  const exportAsMarkdown = () => {
+    const title = conversations.find((c) => c.id === conversationId)?.title || selectedDoc?.filename || 'Mindora-Chat-Transcript';
+    const cleanTitle = title.replace(/[^a-zA-Z0-9-_ ]/g, '').trim().replace(/\s+/g, '_');
+
+    let md = `# ${title}\n\n`;
+    md += `> **Source:** Mindora AI Workspace\n`;
+    md += `> **Date:** ${new Date().toLocaleString()}\n`;
+    if (selectedDoc) {
+      md += `> **Scoped Focus:** ${selectedDoc.filename}\n`;
+    }
+    md += `\n---\n\n`;
+
+    const chatItems = messages.filter((m) => m.id !== 'mindora-welcome-message');
+    chatItems.forEach((msg) => {
+      if (msg.role === 'user') {
+        md += `### 👤 User:\n\n${msg.content}\n\n`;
+      } else {
+        md += `### 🤖 Mindora Assistant:\n\n${msg.content}\n\n`;
+        const stats: string[] = [];
+        if (msg.responseTimeMs) stats.push(`Latency: ${msg.responseTimeMs}ms`);
+        if (msg.totalTokens) stats.push(`Tokens: ${msg.totalTokens} (Prompt: ${msg.promptTokens ?? 'N/A'}, Resp: ${msg.completionTokens ?? 'N/A'})`);
+        if (msg.similarityScore) stats.push(`Vector Match: ${(msg.similarityScore * 100).toFixed(1)}%`);
+        if (stats.length > 0) {
+          md += `*📊 ${stats.join(' · ')}*\n\n`;
+        }
+        if (msg.citations && msg.citations.length > 0) {
+          md += `#### 📚 Verified Source Citations:\n`;
+          msg.citations.forEach((c, idx) => {
+            md += `${idx + 1}. **${c.fileName}** ${c.pageNumber ? `(Page ${c.pageNumber})` : ''} - *Match: ${((c.similarityScore ?? 0) * 100).toFixed(0)}%*\n`;
+            md += `   > ${c.snippet.replace(/\n/g, ' ')}\n\n`;
+          });
+        }
+        md += `---\n\n`;
+      }
+    });
+
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${cleanTitle || 'mindora-transcript'}.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('Chat transcript exported as Markdown (.md)');
+  };
+
+  const exportAsJson = () => {
+    const title = conversations.find((c) => c.id === conversationId)?.title || selectedDoc?.filename || 'Mindora-Chat-Transcript';
+    const cleanTitle = title.replace(/[^a-zA-Z0-9-_ ]/g, '').trim().replace(/\s+/g, '_');
+
+    const payload = {
+      title,
+      exportedAt: new Date().toISOString(),
+      documentScope: selectedDoc ? { id: selectedDoc.id, filename: selectedDoc.filename } : 'ALL_DOCUMENTS',
+      messages: messages
+        .filter((m) => m.id !== 'mindora-welcome-message')
+        .map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          responseTimeMs: m.responseTimeMs,
+          similarityScore: m.similarityScore,
+          promptTokens: m.promptTokens,
+          completionTokens: m.completionTokens,
+          totalTokens: m.totalTokens,
+          citations: m.citations,
+          timestamp: m.timestamp,
+        })),
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${cleanTitle || 'mindora-transcript'}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('Chat transcript exported as JSON (.json)');
   };
 
   const isBusy = isLoading || isStreaming;
@@ -692,8 +878,14 @@ const ChatView: React.FC = () => {
 
         {/* Message Thread */}
         <div className="max-w-3xl mx-auto space-y-6">
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
+          {messages.map((msg, index) => (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              isLastAssistant={msg.role === 'assistant' && index === messages.length - 1}
+              onRegenerate={handleRegenerate}
+              onEditPrompt={handleEditPrompt}
+            />
           ))}
 
           {isLoading && !isStreaming && <TypingIndicator />}
@@ -747,17 +939,60 @@ const ChatView: React.FC = () => {
                 </button>
               </div>
 
-              {/* Clear conversation */}
-              {messages.length > 1 && (
-                <button
-                  onClick={clearChat}
-                  className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 p-0.5 hover:bg-slate-800 rounded transition-colors"
-                  title="Start new conversation"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span className="hidden sm:inline">New Chat</span>
-                </button>
-              )}
+              {/* Clear & Export Actions */}
+              <div className="flex items-center gap-1.5">
+                {/* 1-Click Export Dropdown */}
+                {messages.length > 1 && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowExportMenu(!showExportMenu)}
+                      className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition-all font-medium"
+                      title="Export chat transcript"
+                    >
+                      <Download className="w-3 h-3 text-cyan-400" />
+                      <span>Export</span>
+                      <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                    </button>
+
+                    {showExportMenu && (
+                      <div className="absolute right-0 bottom-full mb-1.5 w-44 bg-[#0f172a] border border-slate-700/80 rounded-xl shadow-xl py-1 z-30 animate-fade-in glass-panel">
+                        <button
+                          onClick={() => {
+                            exportAsMarkdown();
+                            setShowExportMenu(false);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-teal-500/15 text-left transition-colors"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-teal-400" />
+                          <span>Markdown (.md)</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            exportAsJson();
+                            setShowExportMenu(false);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-cyan-500/15 text-left transition-colors"
+                        >
+                          <FileCode className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>JSON (.json)</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Clear conversation */}
+                {messages.length > 1 && (
+                  <button
+                    onClick={clearChat}
+                    className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 p-0.5 hover:bg-slate-800 rounded transition-colors"
+                    title="Start new conversation"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span className="hidden sm:inline">New Chat</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Input Textarea + Action Button */}

@@ -138,15 +138,17 @@ public class RagService {
     public ChatResponseDto askQuestion(ChatRequestDto request) {
 
         long startTime = System.currentTimeMillis();
-        log.info("Processing query: '{}', scoped documentId: {}", request.getQuestion(), request.getDocumentId());
+        log.info("Processing query: '{}', scoped documentId: {}, conversationId: {}", 
+                request.getQuestion(), request.getDocumentId(), request.getConversationId());
         List<Document> similarDocuments = this.retrieveRelevantDocuments(request.getQuestion(), request.getDocumentId(),
                 request.getTopK(), request.getMinSimilarity());
 
         List<CitationDto> citationDtos = similarDocuments.stream().map(this::mapToCitation).toList();
 
         String contextText = buildContextString(similarDocuments);
+        String conversationHistory = buildConversationHistoryString(request.getConversationId());
 
-        String prompt = buildPrompt(request.getQuestion(), contextText);
+        String prompt = buildPrompt(request.getQuestion(), contextText, conversationHistory);
 
         var chatResponse = this.chatClient.prompt().user(prompt).call().chatResponse();
         String answer = chatResponse != null && chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null
@@ -164,8 +166,8 @@ public class RagService {
             if (usage.getPromptTokens() != null && usage.getPromptTokens() > 0) {
                 promptTokens = usage.getPromptTokens().intValue();
             }
-            if (usage.getGenerationTokens() != null && usage.getGenerationTokens() > 0) {
-                completionTokens = usage.getGenerationTokens().intValue();
+            if (usage.getCompletionTokens() != null && usage.getCompletionTokens() > 0) {
+                completionTokens = usage.getCompletionTokens().intValue();
             }
         }
         int totalTokens = promptTokens + completionTokens;
@@ -193,14 +195,15 @@ public class RagService {
 
     // this streams
     public Flux<String> streamQuestionAnswer(ChatRequestDto requestDto) {
-        log.info("Streaming query: '{}'", requestDto.getQuestion());
+        log.info("Streaming query: '{}', conversationId: {}", requestDto.getQuestion(), requestDto.getConversationId());
         List<Document> relevantDocuments = retrieveRelevantDocuments(
                 requestDto.getQuestion(),
                 requestDto.getDocumentId(),
                 requestDto.getTopK(),
                 requestDto.getMinSimilarity());
         String contextText = buildContextString(relevantDocuments);
-        String userPrompt = buildPrompt(requestDto.getQuestion(), contextText);
+        String conversationHistory = buildConversationHistoryString(requestDto.getConversationId());
+        String userPrompt = buildPrompt(requestDto.getQuestion(), contextText, conversationHistory);
 
         final List<CitationDto> citationDtos = relevantDocuments.stream().map(this::mapToCitation).toList();
         final String email = SecurityContextHolder.getContext().getAuthentication() != null
@@ -229,34 +232,69 @@ public class RagService {
                 });
     }
 
-    private String buildPrompt(@NotBlank(message = "Question cannot be empty") String question, String contextText) {
+    /**
+     * Retrieve recent conversation turns (up to last 4) for conversational memory context.
+     */
+    private String buildConversationHistoryString(String conversationIdStr) {
+        if (conversationIdStr == null || conversationIdStr.isBlank()) {
+            return "";
+        }
+        try {
+            UUID convId = UUID.fromString(conversationIdStr);
+            List<ChatMessage> messages = chatMessageRepository.findByConversationIdOrderByCreatedAtAsc(convId);
+            if (messages == null || messages.isEmpty()) {
+                return "";
+            }
+            // Retain up to the last 4 dialogue turns
+            int start = Math.max(0, messages.size() - 4);
+            List<ChatMessage> recent = messages.subList(start, messages.size());
 
-        if (contextText != null && !contextText.isBlank()) {
-            return String.format(
-                    """
-                                   Document Context:
-                                   ---------------------
-                                   %s
-                                   ---------------------
-                                   User Message / Question: %s
-                                   Instructions:
-                                   - If the user's question relates to the document context above, prioritize answering using that context and reference key sections.
-                                   - If the user is asking a general question, greeting, or discussing topics beyond the document context, respond helpfully and conversationally using your general knowledge while weaving in relevant document context if applicable
+            StringBuilder historyBuilder = new StringBuilder();
+            for (ChatMessage msg : recent) {
+                if (msg.getQuestion() != null && !msg.getQuestion().isBlank()) {
+                    historyBuilder.append("User: ").append(msg.getQuestion().trim()).append("\n");
+                }
+                if (msg.getAnswer() != null && !msg.getAnswer().isBlank()) {
+                    String ans = msg.getAnswer().trim();
+                    if (ans.length() > 500) {
+                        ans = ans.substring(0, 500) + "... [truncated]";
+                    }
+                    historyBuilder.append("Assistant: ").append(ans).append("\n\n");
+                }
+            }
+            return historyBuilder.toString().trim();
+        } catch (Exception e) {
+            log.warn("Could not retrieve conversation history for id {}: {}", conversationIdStr, e.getMessage());
+            return "";
+        }
+    }
 
-                            """,
-                    contextText, question);
-        } else {
-            return String.format(
-                    """
-                               User Message / Question:
-                               %s
-                               Instructions:
-                                  - Respond helpfully, accurately, and conversationally to the user's message using your broad knowledge base.
+    private String buildPrompt(String question, String contextText, String conversationHistory) {
+        StringBuilder sb = new StringBuilder();
 
-                            """,
-                    question);
+        if (conversationHistory != null && !conversationHistory.isBlank()) {
+            sb.append("Recent Conversation History (for conversational context & follow-ups):\n");
+            sb.append("---------------------\n");
+            sb.append(conversationHistory).append("\n");
+            sb.append("---------------------\n\n");
         }
 
+        if (contextText != null && !contextText.isBlank()) {
+            sb.append("Document Context:\n");
+            sb.append("---------------------\n");
+            sb.append(contextText).append("\n");
+            sb.append("---------------------\n\n");
+        }
+
+        sb.append("Current User Message / Question: ").append(question).append("\n\n");
+        sb.append("Instructions:\n");
+        sb.append("- Pay attention to the recent conversation history to understand context, follow-up questions, pronouns, and previous dialogue.\n");
+        if (contextText != null && !contextText.isBlank()) {
+            sb.append("- If the question relates to the document context above, prioritize answering using that context and reference key sections or data.\n");
+        }
+        sb.append("- If the user is asking a general question, greeting, or discussing topics beyond the document context, respond helpfully and conversationally using your broad knowledge base.\n");
+
+        return sb.toString();
     }
 
     private String buildContextString(List<Document> similarDocuments) {
@@ -420,6 +458,37 @@ public class RagService {
         chatMessageRepository.deleteByConversationId(conversation.getId());
         conversationRepository.delete(conversation);
         log.info("Deleted conversation: {} and all its messages", conversationId);
+    }
+
+    /**
+     * Update the title of an existing conversation
+     */
+    @Transactional
+    public ConversationDto updateConversationTitle(UUID conversationId, String newTitle) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        if (email == null || email.equals("anonymousUser")) {
+            throw new IllegalArgumentException("Unauthorized");
+        }
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Conversation conversation = conversationRepository.findByIdAndUserId(conversationId, user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Conversation not found or access denied"));
+
+        if (newTitle != null && !newTitle.isBlank()) {
+            conversation.setTitle(newTitle.trim());
+            conversation = conversationRepository.saveAndFlush(conversation);
+            log.info("Updated title for conversation {} to '{}'", conversationId, conversation.getTitle());
+        }
+
+        return ConversationDto.builder()
+                .id(conversation.getId())
+                .title(conversation.getTitle())
+                .description(conversation.getDescription())
+                .messageCount(conversation.getMessageCount())
+                .createdAt(conversation.getCreatedAt())
+                .updatedAt(conversation.getUpdatedAt())
+                .build();
     }
 
 }

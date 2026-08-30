@@ -2,12 +2,12 @@ import React, { useState, useMemo } from 'react';
 import {
   Brain, MessageSquare, Search, Layers, Plus, Upload, Trash2, ChevronDown, ChevronUp,
   CheckCircle, Clock, AlertCircle, Loader2, X, FileType, FilePieChart, FileText, File,
-  FolderOpen, Sun, Moon, LogOut, Sparkles, Filter, Check, PanelLeftClose,
+  FolderOpen, Sun, Moon, LogOut, Sparkles, Filter, Check, PanelLeftClose, Edit2,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
-import type { DocumentMetadataDto, DocumentStatus } from '../types';
+import type { DocumentMetadataDto, DocumentStatus, ConversationDto } from '../types';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 
@@ -177,6 +177,137 @@ const DocumentItem: React.FC<{ doc: DocumentMetadataDto }> = ({ doc }) => {
               <p className="text-[11px] text-rose-400 leading-snug">{doc.errorMessage}</p>
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ConversationListItem: React.FC<{
+  conv: ConversationDto;
+  isSelected: boolean;
+}> = ({ conv, isSelected }) => {
+  const {
+    setSelectedConversationId,
+    setActiveTab,
+    setIsSidebarOpen,
+    deleteConversation,
+    renameConversation,
+  } = useApp();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(conv.title);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const handleSaveRename = async (e?: React.MouseEvent | React.FormEvent) => {
+    if (e) e.stopPropagation();
+    if (!editTitle.trim() || editTitle.trim() === conv.title) {
+      setIsEditing(false);
+      return;
+    }
+    const success = await renameConversation(conv.id, editTitle.trim());
+    if (success) {
+      setIsEditing(false);
+    }
+  };
+
+  const handleCancelRename = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditTitle(conv.title);
+    setIsEditing(false);
+  };
+
+  return (
+    <div
+      onClick={() => {
+        if (isEditing) return;
+        setSelectedConversationId(conv.id);
+        setActiveTab('chat');
+        if (window.innerWidth < 768) setIsSidebarOpen(false);
+      }}
+      className={clsx(
+        'p-2.5 rounded-xl border cursor-pointer transition-all duration-150 flex items-start justify-between gap-2 group',
+        isSelected
+          ? 'border-teal-500/60 bg-teal-500/10 text-white shadow-sm'
+          : 'border-slate-800 bg-slate-900/50 text-slate-300 hover:border-slate-700 hover:bg-slate-800/50'
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        {isEditing ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSaveRename(e);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-1"
+          >
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              autoFocus
+              className="w-full text-xs bg-slate-950 border border-teal-500/60 rounded px-1.5 py-0.5 text-white focus:outline-none focus:ring-1 focus:ring-teal-400"
+            />
+            <button
+              type="submit"
+              className="p-1 text-teal-400 hover:text-teal-300 hover:bg-teal-500/20 rounded transition-colors"
+              title="Save name"
+            >
+              <Check className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleCancelRename}
+              className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition-colors"
+              title="Cancel"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </form>
+        ) : (
+          <>
+            <p className="text-xs font-medium truncate group-hover:text-white transition-colors" title={conv.title}>
+              {conv.title}
+            </p>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              {conv.messageCount} msg{conv.messageCount !== 1 ? 's' : ''} · {formatDate(conv.updatedAt)}
+            </p>
+          </>
+        )}
+      </div>
+
+      {!isEditing && (
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditTitle(conv.title);
+              setIsEditing(true);
+            }}
+            className="p-1 text-slate-500 hover:text-teal-400 hover:bg-slate-800 rounded-lg transition-colors"
+            title="Rename chat"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!confirmDelete) {
+                setConfirmDelete(true);
+                setTimeout(() => setConfirmDelete(false), 3000);
+              } else {
+                deleteConversation(conv.id);
+              }
+            }}
+            className={clsx(
+              'p-1 rounded-lg transition-colors text-xs',
+              confirmDelete ? 'text-rose-400 bg-rose-500/20 font-medium px-1.5' : 'text-slate-500 hover:text-rose-400 hover:bg-slate-800'
+            )}
+            title={confirmDelete ? 'Click again to confirm delete' : 'Delete chat session'}
+          >
+            {confirmDelete ? 'Confirm?' : <Trash2 className="w-3.5 h-3.5" />}
+          </button>
         </div>
       )}
     </div>
@@ -439,46 +570,19 @@ const Sidebar: React.FC<SidebarProps> = ({ onUploadClick }) => {
             <>
               {filteredConversations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-36 text-center px-4">
-                  <p className="text-xs text-slate-400 font-medium">No chat history yet</p>
-                  <p className="text-[11px] text-slate-500 mt-1">Start a conversation to save past queries.</p>
+                  <p className="text-xs text-slate-400 font-medium">No chat history found</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    {searchQuery ? 'Try a different search keyword.' : 'Start a conversation to save past queries.'}
+                  </p>
                 </div>
               ) : (
-                filteredConversations.map((conv) => {
-                  const isSelected = selectedConversationId === conv.id;
-                  return (
-                    <div
-                      key={conv.id}
-                      onClick={() => {
-                        setSelectedConversationId(conv.id);
-                        setActiveTab('chat');
-                        if (window.innerWidth < 768) setIsSidebarOpen(false);
-                      }}
-                      className={clsx(
-                        'p-2.5 rounded-xl border cursor-pointer transition-all duration-150 flex items-start justify-between gap-2 group',
-                        isSelected
-                          ? 'border-teal-500/60 bg-teal-500/10 text-white'
-                          : 'border-slate-800 bg-slate-900/50 text-slate-300 hover:border-slate-700 hover:bg-slate-800/50'
-                      )}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium truncate group-hover:text-white transition-colors">{conv.title}</p>
-                        <p className="text-[10px] text-slate-500 mt-0.5">
-                          {conv.messageCount} msg{conv.messageCount !== 1 ? 's' : ''} · {formatDate(conv.updatedAt)}
-                        </p>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteConversation(conv.id);
-                        }}
-                        className="p-1 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                        title="Delete chat session"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  );
-                })
+                filteredConversations.map((conv) => (
+                  <ConversationListItem
+                    key={conv.id}
+                    conv={conv}
+                    isSelected={selectedConversationId === conv.id}
+                  />
+                ))
               )}
             </>
           )}

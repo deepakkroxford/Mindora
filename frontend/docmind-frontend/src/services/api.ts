@@ -144,6 +144,11 @@ export const chatApi = {
     const { data } = await api.delete<ApiResponse<void>>(`/chat/conversations/${conversationId}`);
     return data;
   },
+
+  updateConversation: async (conversationId: string, title: string): Promise<ApiResponse<ConversationDto>> => {
+    const { data } = await api.patch<ApiResponse<ConversationDto>>(`/chat/conversations/${conversationId}`, { title });
+    return data;
+  },
 };
 
 export default api;

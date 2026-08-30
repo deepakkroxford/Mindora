@@ -17,8 +17,9 @@ interface AppContextType {
   conversations: ConversationDto[];
   selectedConversationId: string | null;
   setSelectedConversationId: (id: string | null) => void;
-  fetchConversations: () => Promise<void>;
+  fetchConversations: () => Promise<ConversationDto[]>;
   deleteConversation: (id: string) => Promise<void>;
+  renameConversation: (id: string, newTitle: string) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -28,7 +29,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'search' | 'chunks'>('chat');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [conversations, setConversations] = useState<ConversationDto[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -45,16 +46,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  const fetchConversations = useCallback(async () => {
+  const fetchConversations = useCallback(async (): Promise<ConversationDto[]> => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) return;
+      if (!token) return [];
       const resp = await chatApi.getConversations();
       if (resp.success && resp.data) {
         setConversations(resp.data);
+        return resp.data;
       }
+      return [];
     } catch (err) {
       console.error('Failed to fetch conversations', err);
+      return [];
     }
   }, []);
 
@@ -80,6 +84,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [selectedConversationId]);
 
+  const renameConversation = useCallback(async (id: string, newTitle: string): Promise<boolean> => {
+    if (!newTitle.trim()) return false;
+    try {
+      const resp = await chatApi.updateConversation(id, newTitle.trim());
+      if (resp.success && resp.data) {
+        setConversations((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, title: resp.data.title } : c))
+        );
+        toast.success('Chat renamed');
+        return true;
+      }
+      return false;
+    } catch {
+      toast.error('Failed to rename chat');
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
     fetchDocuments();
     fetchConversations();
@@ -103,6 +125,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedConversationId,
         fetchConversations,
         deleteConversation,
+        renameConversation,
       }}
     >
       {children}
