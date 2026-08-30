@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Brain, MessageSquare, Search, Layers, Plus, Upload, Trash2, ChevronDown, ChevronUp,
   CheckCircle, Clock, AlertCircle, Loader2, X, FileType, FilePieChart, FileText, File,
-  FolderOpen, Sun, Moon, LogOut, Sparkles, Filter, Check, PanelLeftClose, Edit2,
+  FolderOpen, Sun, Moon, LogOut, Sparkles, Filter, Check, PanelLeftClose, Edit2, BookOpen,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
@@ -70,10 +70,10 @@ const StatusBadge: React.FC<{ status: DocumentStatus }> = ({ status }) => {
 };
 
 const DocumentItem: React.FC<{ doc: DocumentMetadataDto }> = ({ doc }) => {
-  const { selectedDocumentId, setSelectedDocumentId, deleteDocument, setIsSidebarOpen } = useApp();
+  const { selectedDocumentIds, toggleDocumentSelection, deleteDocument, setIsSidebarOpen } = useApp();
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const isSelected = selectedDocumentId === doc.id;
+  const isSelected = selectedDocumentIds.includes(doc.id);
 
   const handleDelete = () => {
     if (confirmDelete) {
@@ -98,12 +98,22 @@ const DocumentItem: React.FC<{ doc: DocumentMetadataDto }> = ({ doc }) => {
       <div
         className="flex items-start gap-2.5 p-2.5 cursor-pointer"
         onClick={() => {
-          setSelectedDocumentId(isSelected ? null : doc.id);
+          toggleDocumentSelection(doc.id);
           if (window.innerWidth < 768) {
             setIsSidebarOpen(false);
           }
         }}
       >
+        {/* Checkbox indicator */}
+        <div className="pt-0.5">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => {}}
+            className="w-3.5 h-3.5 rounded border-slate-700 text-teal-500 focus:ring-teal-400 bg-slate-950/60 cursor-pointer accent-teal-500"
+          />
+        </div>
+
         <div className={clsx(
           'p-1.5 rounded-lg flex-shrink-0 mt-0.5 transition-colors',
           isSelected ? 'bg-teal-500/20 text-teal-300' : 'bg-slate-800 text-slate-400 group-hover:text-slate-200'
@@ -320,6 +330,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onUploadClick }) => {
     isLoadingDocuments,
     selectedDocumentId,
     setSelectedDocumentId,
+    selectedDocumentIds,
+    selectAllDocuments,
+    clearDocumentSelection,
     isSidebarOpen,
     setIsSidebarOpen,
     conversations,
@@ -375,6 +388,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onUploadClick }) => {
     { id: 'chat' as const, label: 'Chat Assistant', icon: MessageSquare, badge: null },
     { id: 'search' as const, label: 'Semantic Search', icon: Search, badge: null },
     { id: 'chunks' as const, label: 'Vector Chunks', icon: Layers, badge: documents.length > 0 ? `${documents.length}` : null },
+    { id: 'guide' as const, label: 'Platform Guide & Arch', icon: BookOpen, badge: 'NEW' },
   ];
 
   return (
@@ -538,15 +552,27 @@ const Sidebar: React.FC<SidebarProps> = ({ onUploadClick }) => {
               </button>
 
               {/* Active document scope banner */}
-              {selectedDocumentId && (
-                <div className="px-2 py-1.5 bg-teal-500/10 border border-teal-500/30 rounded-xl flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-teal-300 font-medium truncate">Filter active</span>
-                  <button
-                    onClick={() => setSelectedDocumentId(null)}
-                    className="text-[10px] text-teal-400 hover:text-white underline underline-offset-2 flex-shrink-0"
-                  >
-                    Clear
-                  </button>
+              {selectedDocumentIds.length > 0 && (
+                <div className="px-2.5 py-1.5 bg-teal-500/10 border border-teal-500/30 rounded-xl flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-teal-300 font-medium truncate">
+                    {selectedDocumentIds.length === 1
+                      ? '1 Document Scoped'
+                      : `${selectedDocumentIds.length} Docs Scoped (Multi-RAG)`}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={selectAllDocuments}
+                      className="text-[10px] text-slate-400 hover:text-teal-300 transition-colors"
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={clearDocumentSelection}
+                      className="text-[10px] text-teal-400 hover:text-white underline underline-offset-2 flex-shrink-0"
+                    >
+                      Clear
+                    </button>
+                  </div>
                 </div>
               )}
 

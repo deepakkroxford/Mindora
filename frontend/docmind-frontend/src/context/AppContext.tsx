@@ -7,11 +7,16 @@ interface AppContextType {
   documents: DocumentMetadataDto[];
   selectedDocumentId: string | null;
   setSelectedDocumentId: (id: string | null) => void;
+  selectedDocumentIds: string[];
+  setSelectedDocumentIds: (ids: string[]) => void;
+  toggleDocumentSelection: (id: string) => void;
+  selectAllDocuments: () => void;
+  clearDocumentSelection: () => void;
   fetchDocuments: () => Promise<void>;
   deleteDocument: (id: string) => Promise<void>;
   isLoadingDocuments: boolean;
-  activeTab: 'chat' | 'search' | 'chunks';
-  setActiveTab: (tab: 'chat' | 'search' | 'chunks') => void;
+  activeTab: 'chat' | 'search' | 'chunks' | 'guide';
+  setActiveTab: (tab: 'chat' | 'search' | 'chunks' | 'guide') => void;
   isSidebarOpen: boolean;
   setIsSidebarOpen: (v: boolean) => void;
   conversations: ConversationDto[];
@@ -26,13 +31,33 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [documents, setDocuments] = useState<DocumentMetadataDto[]>([]);
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'search' | 'chunks'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'search' | 'chunks' | 'guide'>('chat');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [conversations, setConversations] = useState<ConversationDto[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+
+  const selectedDocumentId = selectedDocumentIds.length === 1 ? selectedDocumentIds[0] : null;
+
+  const setSelectedDocumentId = useCallback((id: string | null) => {
+    setSelectedDocumentIds(id ? [id] : []);
+  }, []);
+
+  const toggleDocumentSelection = useCallback((id: string) => {
+    setSelectedDocumentIds((prev) =>
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
+    );
+  }, []);
+
+  const selectAllDocuments = useCallback(() => {
+    setSelectedDocumentIds(documents.map((d) => d.id));
+  }, [documents]);
+
+  const clearDocumentSelection = useCallback(() => {
+    setSelectedDocumentIds([]);
+  }, []);
 
   const fetchDocuments = useCallback(async () => {
     setIsLoadingDocuments(true);
@@ -113,6 +138,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         documents,
         selectedDocumentId,
         setSelectedDocumentId,
+        selectedDocumentIds,
+        setSelectedDocumentIds,
+        toggleDocumentSelection,
+        selectAllDocuments,
+        clearDocumentSelection,
         fetchDocuments,
         deleteDocument,
         isLoadingDocuments,

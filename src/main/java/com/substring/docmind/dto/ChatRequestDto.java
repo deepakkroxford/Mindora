@@ -3,6 +3,7 @@ package com.substring.docmind.dto;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -17,6 +18,8 @@ public class ChatRequestDto {
     private String question;
 
     private UUID documentId;
+
+    private List<UUID> documentIds;
 
     @Min(value = 1, message = "topK must be at least 1")
     @Max(value = 50, message = "topK cannot exceed 50")

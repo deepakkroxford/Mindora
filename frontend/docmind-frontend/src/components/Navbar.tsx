@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   PanelLeft, FileText, X, ChevronRight, Upload, Sparkles,
-  Layers, Search, MessageSquare, Globe, Sun, Moon,
+  Layers, Search, MessageSquare, Globe, Sun, Moon, BookOpen,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
@@ -14,6 +14,7 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({ onUploadClick }) => {
   const {
     activeTab,
+    setActiveTab,
     isSidebarOpen,
     setIsSidebarOpen,
     documents,
@@ -33,6 +34,8 @@ const Navbar: React.FC<NavbarProps> = ({ onUploadClick }) => {
         return { label: 'Semantic Search', icon: Search };
       case 'chunks':
         return { label: 'Vector Chunks Explorer', icon: Layers };
+      case 'guide':
+        return { label: 'Platform Guide & Arch', icon: BookOpen };
       default:
         return { label: 'Assistant', icon: MessageSquare };
     }
@@ -92,8 +95,22 @@ const Navbar: React.FC<NavbarProps> = ({ onUploadClick }) => {
         <span>{currentTab.label}</span>
       </div>
 
-      {/* Right: Theme Toggle & Quick Actions */}
+      {/* Right: Theme Toggle, Guide & Quick Actions */}
       <div className="flex items-center gap-2 flex-shrink-0">
+        <button
+          onClick={() => setActiveTab(activeTab === 'guide' ? 'chat' : 'guide')}
+          className={clsx(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all',
+            activeTab === 'guide'
+              ? 'bg-teal-500/20 text-teal-300 border-teal-500/40 shadow-sm shadow-teal-500/10'
+              : 'bg-slate-800/80 text-slate-300 border-slate-700/80 hover:text-teal-300 hover:bg-slate-700'
+          )}
+          title="View Platform Capabilities & Guide"
+        >
+          <BookOpen className="w-3.5 h-3.5 text-teal-400" />
+          <span className="hidden sm:inline">Guide & Docs</span>
+        </button>
+
         <button
           onClick={toggleTheme}
           className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 rounded-xl transition-colors border border-transparent hover:border-slate-700/60"
