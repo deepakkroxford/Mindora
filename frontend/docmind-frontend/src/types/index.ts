@@ -44,6 +44,7 @@ export interface CitationDto {
 export interface ChatRequestDto {
   question: string;
   documentId?: string;
+  documentIds?: string[];
   topK?: number;
   minSimilarity?: number;
   conversationId?: string;

@@ -1,5 +1,7 @@
 package com.substring.docmind.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.substring.docmind.config.AppProperties;
 import com.substring.docmind.dto.*;
 import jakarta.validation.constraints.NotBlank;
@@ -12,13 +14,12 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.time.LocalDateTime;
 
@@ -42,6 +43,8 @@ public class RagService {
     private final ChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
     private final PlatformTransactionManager transactionManager;
+    private final JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
 
     /**
      * Approximate token estimation (~3.8 characters per token)
@@ -49,6 +52,53 @@ public class RagService {
     private int estimateTokens(String text) {
         if (text == null || text.isBlank()) return 0;
         return Math.max(1, (int) Math.ceil(text.length() / 3.8));
+    }
+
+    /**
+     * Consolidates single documentId and multi-document documentIds list into a unified list of UUIDs.
+     */
+    private List<UUID> resolveEffectiveDocIds(UUID singleId, List<UUID> multiIds) {
+        Set<UUID> ids = new LinkedHashSet<>();
+        if (singleId != null) {
+            ids.add(singleId);
+        }
+        if (multiIds != null) {
+            ids.addAll(multiIds.stream().filter(Objects::nonNull).toList());
+        }
+        return new ArrayList<>(ids);
+    }
+
+    /**
+     * Background async LLM title generator: replaces truncated prompts with crisp 3-5 word titles.
+     */
+    private void generateAndSaveAiTitle(UUID conversationId, String promptText) {
+        if (conversationId == null || promptText == null || promptText.isBlank()) return;
+        try {
+            String titlePrompt = "Generate a concise, professional conversation title (maximum 3 to 5 words, no quotation marks, no preamble like 'Title:', no trailing period) that captures the core subject of this user inquiry: \"" + promptText + "\"";
+            var response = chatClient.prompt().user(titlePrompt).call().content();
+            if (response != null && !response.isBlank()) {
+                String cleanTitle = response.trim()
+                        .replaceAll("^[\"']+|[\"']+$", "")
+                        .replaceAll("(?i)^title:\\s*", "")
+                        .replaceAll("[\\n\\r]+", " ")
+                        .trim();
+                if (cleanTitle.length() > 60) {
+                    cleanTitle = cleanTitle.substring(0, 57) + "...";
+                }
+                TransactionTemplate tx = new TransactionTemplate(transactionManager);
+                final String finalTitle = cleanTitle;
+                tx.execute(status -> {
+                    conversationRepository.findById(conversationId).ifPresent(c -> {
+                        c.setTitle(finalTitle);
+                        conversationRepository.saveAndFlush(c);
+                        log.info("AI generated conversation title for id {}: '{}'", conversationId, finalTitle);
+                    });
+                    return null;
+                });
+            }
+        } catch (Exception e) {
+            log.warn("Async AI conversation title generation failed for id {}: {}", conversationId, e.getMessage());
+        }
     }
 
     /**
@@ -93,27 +143,37 @@ public class RagService {
                 }
 
                 if (conversation == null) {
-                    String title = request.getQuestion().length() > 60 
+                    String initialTitle = request.getQuestion().length() > 60 
                             ? request.getQuestion().substring(0, 57) + "..." 
                             : request.getQuestion();
                     conversation = Conversation.builder()
                             .user(user)
-                            .title(title)
+                            .title(initialTitle)
                             .messageCount(0)
                             .build();
                     conversation = conversationRepository.saveAndFlush(conversation);
-                    log.info("Created new conversation: id={}, title='{}' for user={}", conversation.getId(), title, email);
+                    log.info("Created new conversation: id={}, title='{}' for user={}", conversation.getId(), initialTitle, email);
+
+                    // Trigger async background LLM title generation
+                    final UUID convIdForAsync = conversation.getId();
+                    final String promptForTitle = request.getQuestion();
+                    CompletableFuture.runAsync(() -> generateAndSaveAiTitle(convIdForAsync, promptForTitle));
                 }
 
                 Double topSimilarityScore = (citationDtos != null && !citationDtos.isEmpty())
                         ? citationDtos.get(0).getSimilarityScore()
                         : null;
 
+                UUID primaryDocId = request.getDocumentId();
+                if (primaryDocId == null && request.getDocumentIds() != null && !request.getDocumentIds().isEmpty()) {
+                    primaryDocId = request.getDocumentIds().get(0);
+                }
+
                 ChatMessage chatMessage = ChatMessage.builder()
                         .conversation(conversation)
                         .question(request.getQuestion())
                         .answer(answer)
-                        .documentId(request.getDocumentId())
+                        .documentId(primaryDocId)
                         .similarityScore(topSimilarityScore)
                         .promptTokens(promptTokens)
                         .completionTokens(completionTokens)
@@ -133,22 +193,56 @@ public class RagService {
         });
     }
 
+    /**
+     * Detects if the query is a document-level summary or overview request.
+     */
+    private boolean isSummaryIntent(String question) {
+        if (question == null || question.isBlank()) return false;
+        String q = question.toLowerCase().trim();
+        return q.contains("summar") || q.contains("overview") || q.contains("key points") 
+                || q.contains("action items") || q.contains("findings") || q.contains("clauses")
+                || q.contains("what is this document") || q.contains("explain this document")
+                || q.contains("tell me about this document") || q.contains("what does this document say")
+                || q.contains("what is in this document") || q.contains("give me a summary")
+                || q.contains("give me an executive summary") || q.contains("outline")
+                || q.contains("key findings") || q.contains("data points") || q.contains("table of contents")
+                || q.contains("compare") || q.contains("comparison") || q.contains("difference");
+    }
+
     // to ask any thing related to document
     @Transactional
     public ChatResponseDto askQuestion(ChatRequestDto request) {
 
         long startTime = System.currentTimeMillis();
-        log.info("Processing query: '{}', scoped documentId: {}, conversationId: {}", 
-                request.getQuestion(), request.getDocumentId(), request.getConversationId());
-        List<Document> similarDocuments = this.retrieveRelevantDocuments(request.getQuestion(), request.getDocumentId(),
+        List<UUID> effectiveDocIds = resolveEffectiveDocIds(request.getDocumentId(), request.getDocumentIds());
+        log.info("Processing query: '{}', scoped documentIds: {}, conversationId: {}", 
+                request.getQuestion(), effectiveDocIds, request.getConversationId());
+
+        List<Document> similarDocuments = this.retrieveRelevantDocuments(request.getQuestion(), effectiveDocIds,
                 request.getTopK(), request.getMinSimilarity());
 
         List<CitationDto> citationDtos = similarDocuments.stream().map(this::mapToCitation).toList();
+        Double topSimilarityScore = !citationDtos.isEmpty() ? citationDtos.get(0).getSimilarityScore() : null;
+
+        boolean isSummary = isSummaryIntent(request.getQuestion());
+        boolean isScoped = !effectiveDocIds.isEmpty();
+
+        boolean isLowRelevance;
+        if (isScoped || isSummary) {
+            isLowRelevance = similarDocuments.isEmpty();
+        } else {
+            isLowRelevance = similarDocuments.isEmpty() || (topSimilarityScore != null && topSimilarityScore < 0.45);
+        }
+
+        // If Guardrail triggers (out-of-domain query), do not attach false citations from unrelated docs
+        if (isLowRelevance) {
+            citationDtos = Collections.emptyList();
+        }
 
         String contextText = buildContextString(similarDocuments);
         String conversationHistory = buildConversationHistoryString(request.getConversationId());
 
-        String prompt = buildPrompt(request.getQuestion(), contextText, conversationHistory);
+        String prompt = buildPrompt(request.getQuestion(), contextText, conversationHistory, isLowRelevance);
 
         var chatResponse = this.chatClient.prompt().user(prompt).call().chatResponse();
         String answer = chatResponse != null && chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null
@@ -172,8 +266,6 @@ public class RagService {
         }
         int totalTokens = promptTokens + completionTokens;
 
-        Double topSimilarityScore = !citationDtos.isEmpty() ? citationDtos.get(0).getSimilarityScore() : null;
-
         // Get current authenticated user and save history
         String email = SecurityContextHolder.getContext().getAuthentication() != null
                 ? SecurityContextHolder.getContext().getAuthentication().getName()
@@ -195,17 +287,35 @@ public class RagService {
 
     // this streams
     public Flux<String> streamQuestionAnswer(ChatRequestDto requestDto) {
-        log.info("Streaming query: '{}', conversationId: {}", requestDto.getQuestion(), requestDto.getConversationId());
+        List<UUID> effectiveDocIds = resolveEffectiveDocIds(requestDto.getDocumentId(), requestDto.getDocumentIds());
+        log.info("Streaming query: '{}', scoped documentIds: {}, conversationId: {}", 
+                requestDto.getQuestion(), effectiveDocIds, requestDto.getConversationId());
+
         List<Document> relevantDocuments = retrieveRelevantDocuments(
                 requestDto.getQuestion(),
-                requestDto.getDocumentId(),
+                effectiveDocIds,
                 requestDto.getTopK(),
                 requestDto.getMinSimilarity());
+
+        List<CitationDto> initialCitations = relevantDocuments.stream().map(this::mapToCitation).toList();
+        final Double topSimilarityScore = !initialCitations.isEmpty() ? initialCitations.get(0).getSimilarityScore() : null;
+
+        boolean isSummary = isSummaryIntent(requestDto.getQuestion());
+        boolean isScoped = !effectiveDocIds.isEmpty();
+
+        boolean isLowRelevance;
+        if (isScoped || isSummary) {
+            isLowRelevance = relevantDocuments.isEmpty();
+        } else {
+            isLowRelevance = relevantDocuments.isEmpty() || (topSimilarityScore != null && topSimilarityScore < 0.45);
+        }
+
+        final List<CitationDto> citationDtos = isLowRelevance ? Collections.emptyList() : initialCitations;
+
         String contextText = buildContextString(relevantDocuments);
         String conversationHistory = buildConversationHistoryString(requestDto.getConversationId());
-        String userPrompt = buildPrompt(requestDto.getQuestion(), contextText, conversationHistory);
+        String userPrompt = buildPrompt(requestDto.getQuestion(), contextText, conversationHistory, isLowRelevance);
 
-        final List<CitationDto> citationDtos = relevantDocuments.stream().map(this::mapToCitation).toList();
         final String email = SecurityContextHolder.getContext().getAuthentication() != null
                 ? SecurityContextHolder.getContext().getAuthentication().getName()
                 : null;
@@ -269,7 +379,10 @@ public class RagService {
         }
     }
 
-    private String buildPrompt(String question, String contextText, String conversationHistory) {
+    /**
+     * Constructs prompt with Context Compression, Guardrails, and Conversational History.
+     */
+    private String buildPrompt(String question, String contextText, String conversationHistory, boolean isLowRelevance) {
         StringBuilder sb = new StringBuilder();
 
         if (conversationHistory != null && !conversationHistory.isBlank()) {
@@ -279,7 +392,19 @@ public class RagService {
             sb.append("---------------------\n\n");
         }
 
-        if (contextText != null && !contextText.isBlank()) {
+        if (isLowRelevance) {
+            sb.append("⚠️ GUARDRAIL ENFORCEMENT: Out-of-Domain / Low Document Confidence\n");
+            sb.append("---------------------\n");
+            sb.append("The question is not covered by the uploaded document context (No matching document content found).\n");
+            sb.append("MANDATORY INSTRUCTIONS:\n");
+            sb.append("1. You MUST begin the very first line of your response with exactly:\n");
+            sb.append("   'ℹ️ *This topic was not found in your uploaded documents. Answering with general model knowledge:*'\n");
+            sb.append("2. Provide an accurate, helpful answer using your broad general knowledge.\n");
+            sb.append("3. Do NOT cite the uploaded document for this answer.\n");
+            sb.append("---------------------\n\n");
+        }
+
+        if (contextText != null && !contextText.isBlank() && !isLowRelevance) {
             sb.append("Document Context:\n");
             sb.append("---------------------\n");
             sb.append(contextText).append("\n");
@@ -289,37 +414,46 @@ public class RagService {
         sb.append("Current User Message / Question: ").append(question).append("\n\n");
         sb.append("Instructions:\n");
         sb.append("- Pay attention to the recent conversation history to understand context, follow-up questions, pronouns, and previous dialogue.\n");
-        if (contextText != null && !contextText.isBlank()) {
-            sb.append("- If the question relates to the document context above, prioritize answering using that context and reference key sections or data.\n");
+        if (contextText != null && !contextText.isBlank() && !isLowRelevance) {
+            sb.append("- Since the question relates to the document context above, prioritize answering using that context and reference key sections or data.\n");
         }
-        sb.append("- If the user is asking a general question, greeting, or discussing topics beyond the document context, respond helpfully and conversationally using your broad knowledge base.\n");
+        sb.append("- Respond helpfully, accurately, and conversationally using your broad knowledge base.\n");
 
         return sb.toString();
     }
 
+    /**
+     * Latency-optimized Context builder: Caps character count (~3,500 chars / ~850 tokens)
+     * to keep Time-To-First-Token (TTFT) ultra-fast without overloading prompt length.
+     */
     private String buildContextString(List<Document> similarDocuments) {
         if (similarDocuments == null || similarDocuments.isEmpty()) {
             return "";
         }
 
-        return similarDocuments.stream().map(doc -> {
+        StringBuilder sb = new StringBuilder();
+        int totalChars = 0;
+        final int MAX_CONTEXT_CHARS = 3500;
+
+        for (Document doc : similarDocuments) {
             String fileName = (String) doc.getMetadata().getOrDefault("fileName", "Unknown File");
             Object page = doc.getMetadata().getOrDefault("pageNumber", "N/A");
-            return String.format("[Source: %s | Page: %s]\n%s", fileName, page, doc.getText());
-        }).collect(Collectors.joining("\n\n---\n\n"));
+            String chunkText = doc.getText();
+            if (chunkText == null || chunkText.isBlank()) continue;
 
-    }
+            if (totalChars + chunkText.length() > MAX_CONTEXT_CHARS) {
+                int remaining = MAX_CONTEXT_CHARS - totalChars;
+                if (remaining > 150) {
+                    sb.append(String.format("[Source: %s | Page: %s]\n%s\n\n---\n\n", fileName, page, chunkText.substring(0, remaining) + "..."));
+                }
+                break;
+            }
 
-    public SearchResultDto searchSimilarChunks(SearchRequestDto request) {
+            sb.append(String.format("[Source: %s | Page: %s]\n%s\n\n---\n\n", fileName, page, chunkText));
+            totalChars += chunkText.length();
+        }
 
-        java.util.List<Document> matchedDocs = retrieveRelevantDocuments(request.getQuery(), request.getDocumentId(),
-                request.getTopK(), request.getSimilaritySearch());
-
-        List<CitationDto> citations = matchedDocs.stream().map(this::mapToCitation).toList();
-
-        return SearchResultDto.builder().query(request.getQuery()).totalMatches(citations.size()).matches(citations)
-                .build();
-
+        return sb.toString().trim();
     }
 
     private CitationDto mapToCitation(Document document) {
@@ -348,41 +482,269 @@ public class RagService {
         Double score = null;
         if (meta.get("distance") instanceof Number n) {
             score = 1.0 - n.doubleValue();
+        } else if (meta.get("similarityScore") instanceof Number n) {
+            score = n.doubleValue();
         }
+
         return CitationDto.builder().documentId(docId).fileName((String) meta.getOrDefault("fileName", "Unknown"))
                 .chunkIndex(chunkIndex).pageNumber(pageNumber).snippet(document.getText()).similarityScore(score)
                 .metadata(meta).build();
     }
 
-    private List<Document> retrieveRelevantDocuments(@NotBlank(message = "Query cannot be empty") String query,
-            UUID documentId, Integer topK, Double similaritySearch) {
+    /**
+     * Fast direct retrieval of document chunks across one or multiple scoped documents for summarization/comparisons
+     */
+    private List<Document> getDocumentOverviewChunks(List<UUID> documentIds, int limit) {
+        if (documentIds == null || documentIds.isEmpty()) {
+            return Collections.emptyList();
+        }
 
+        StringBuilder sql = new StringBuilder("SELECT id, content, metadata FROM vector_store WHERE (metadata->>'documentId' IN (");
+        List<Object> params = new ArrayList<>();
+        for (int i = 0; i < documentIds.size(); i++) {
+            if (i > 0) sql.append(", ");
+            sql.append("?");
+            params.add(documentIds.get(i).toString());
+        }
+        sql.append(")) LIMIT ?");
+        params.add(limit);
+
+        List<Document> docs = new ArrayList<>();
+        try {
+            jdbcTemplate.query(sql.toString(), rs -> {
+                String content = rs.getString("content");
+                String metaJson = rs.getString("metadata");
+                Map<String, Object> metadata = new HashMap<>();
+                if (metaJson != null && !metaJson.isBlank()) {
+                    try {
+                        metadata = objectMapper.readValue(metaJson, new TypeReference<Map<String, Object>>() {});
+                    } catch (Exception ignore) {}
+                }
+                metadata.put("similarityScore", 0.95);
+                metadata.put("matchType", "DOCUMENT_OVERVIEW");
+                docs.add(new Document(content, metadata));
+            }, params.toArray());
+        } catch (Exception e) {
+            log.warn("Failed to retrieve document overview chunks for {}: {}", documentIds, e.getMessage());
+        }
+        return docs;
+    }
+
+    public SearchResultDto searchSimilarChunks(SearchRequestDto request) {
+
+        List<UUID> docIds = request.getDocumentId() != null ? List.of(request.getDocumentId()) : Collections.emptyList();
+        java.util.List<Document> matchedDocs = retrieveRelevantDocuments(request.getQuery(), docIds,
+                request.getTopK(), request.getSimilaritySearch());
+
+        List<CitationDto> citations = matchedDocs.stream().map(this::mapToCitation).toList();
+
+        return SearchResultDto.builder().query(request.getQuery()).totalMatches(citations.size()).matches(citations)
+                .build();
+
+    }
+
+    /**
+     * Parallel Hybrid Retrieval supporting multi-document scoping:
+     * 1. Vector Semantic Cosine Search (pgvector)
+     * 2. Exact Keyword Search (PostgreSQL ILIKE on vector_store)
+     * 3. Reciprocal Rank Fusion (RRF) Reranking
+     */
+    private List<Document> retrieveRelevantDocuments(
+            @NotBlank(message = "Query cannot be empty") String query,
+            List<UUID> documentIds,
+            Integer topK,
+            Double similaritySearch
+    ) {
         int effectiveTopK = (topK != null && topK > 0) ? topK : appProperties.getRag().getTopK();
         double effectiveSimilarity = (similaritySearch != null) ? similaritySearch
                 : appProperties.getRag().getSimilarityThreshold();
 
-        SearchRequest.Builder searchRequestBuilder = SearchRequest.builder().query(query).topK(effectiveTopK);
+        final List<UUID> scopedDocIds = documentIds != null ? documentIds : Collections.emptyList();
 
-        if (effectiveSimilarity > 0.0) {
-            searchRequestBuilder.similarityThreshold(effectiveSimilarity);
+        // If the user scoped document(s) and requested a summary/overview/comparison, load chunks directly
+        if (!scopedDocIds.isEmpty() && isSummaryIntent(query)) {
+            List<Document> overviewDocs = getDocumentOverviewChunks(scopedDocIds, effectiveTopK);
+            if (!overviewDocs.isEmpty()) {
+                log.info("Returning {} direct overview chunks for documentIds: {}", overviewDocs.size(), scopedDocIds);
+                return overviewDocs;
+            }
         }
 
-        if (documentId != null) {
-            log.info("Filtering from document :");
-            FilterExpressionBuilder b = new FilterExpressionBuilder();
-            Filter.Expression documentId1 = b.eq("documentId", documentId.toString()).build();
-            searchRequestBuilder.filterExpression(documentId1);
-        }
+        // 1. Asynchronous Vector Semantic Search
+        CompletableFuture<List<Document>> vectorSearchFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                SearchRequest.Builder searchRequestBuilder = SearchRequest.builder()
+                        .query(query)
+                        .topK(effectiveTopK);
 
+                if (effectiveSimilarity > 0.0) {
+                    searchRequestBuilder.similarityThreshold(effectiveSimilarity);
+                }
+
+                if (!scopedDocIds.isEmpty()) {
+                    FilterExpressionBuilder b = new FilterExpressionBuilder();
+                    if (scopedDocIds.size() == 1) {
+                        searchRequestBuilder.filterExpression(b.eq("documentId", scopedDocIds.get(0).toString()).build());
+                    } else {
+                        String[] idStrings = scopedDocIds.stream().map(UUID::toString).toArray(String[]::new);
+                        searchRequestBuilder.filterExpression(b.in("documentId", (Object[]) idStrings).build());
+                    }
+                }
+
+                List<Document> docs = vectorStore.similaritySearch(searchRequestBuilder.build());
+                log.info("Vector search retrieved {} chunks for query: '{}' across {} scoped doc(s)", docs.size(), query, scopedDocIds.size());
+                return docs;
+            } catch (Exception e) {
+                log.error("Vector similarity search error for query: '{}'", query, e);
+                return Collections.<Document>emptyList();
+            }
+        });
+
+        // 2. Asynchronous Keyword Search on vector_store table
+        CompletableFuture<List<Document>> keywordSearchFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                return performKeywordSearch(query, scopedDocIds, effectiveTopK);
+            } catch (Exception e) {
+                log.warn("Keyword search failed or uninitialized: {}", e.getMessage());
+                return Collections.<Document>emptyList();
+            }
+        });
+
+        // Parallel join: reduces total retrieval latency by ~50%
+        List<Document> vectorDocs;
+        List<Document> keywordDocs;
         try {
-            List<Document> documents = vectorStore.similaritySearch(searchRequestBuilder.build());
-            log.info("Retrieved {} chunks for query: '{}' (scoped docId: {})", documents.size(), query, documentId);
-            return documents;
+            CompletableFuture.allOf(vectorSearchFuture, keywordSearchFuture).join();
+            vectorDocs = vectorSearchFuture.get();
+            keywordDocs = keywordSearchFuture.get();
         } catch (Exception e) {
-            log.error("Similarity search failed for query: '{}'", query, e);
+            log.warn("Hybrid search join failed, falling back to vector docs", e);
+            vectorDocs = vectorSearchFuture.getNow(Collections.emptyList());
+            keywordDocs = Collections.emptyList();
+        }
+
+        // 3. Reciprocal Rank Fusion & Deduplication
+        return fuseAndRerankResults(vectorDocs, keywordDocs, effectiveTopK);
+    }
+
+    private static final Set<String> STOPWORDS = Set.of(
+            "who", "what", "where", "when", "why", "which", "how", "whose", "whom",
+            "is", "are", "was", "were", "be", "been", "being", "am",
+            "do", "does", "did", "have", "has", "had", "having",
+            "can", "could", "should", "would", "will", "shall", "may", "might", "must",
+            "the", "and", "for", "that", "this", "these", "those", "with", "from",
+            "about", "tell", "give", "explain", "describe", "show", "find", "know",
+            "you", "your", "yours", "me", "my", "mine", "he", "his", "she", "her", "they", "their", "it", "its",
+            "ji", "sir", "madam", "mr", "mrs", "ms", "dr", "please", "thanks", "hello", "hi", "some", "any", "all"
+    );
+
+    /**
+     * Fast PostgreSQL Keyword Search for exact terms, product codes, or acronyms
+     */
+    private List<Document> performKeywordSearch(String query, List<UUID> documentIds, int limit) {
+        if (query == null || query.trim().length() < 3) {
             return Collections.emptyList();
         }
 
+        String[] rawTerms = query.split("\\s+");
+        List<String> terms = new ArrayList<>();
+        for (String t : rawTerms) {
+            String clean = t.replaceAll("[^a-zA-Z0-9_-]", "").trim();
+            if (clean.length() >= 3 && !isStopword(clean)) {
+                terms.add(clean.toLowerCase());
+            }
+        }
+
+        if (terms.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        StringBuilder sql = new StringBuilder("SELECT id, content, metadata FROM vector_store WHERE (");
+        List<Object> params = new ArrayList<>();
+        for (int i = 0; i < terms.size(); i++) {
+            if (i > 0) sql.append(" OR ");
+            sql.append("content ILIKE ?");
+            params.add("%" + terms.get(i) + "%");
+        }
+        sql.append(")");
+
+        if (documentIds != null && !documentIds.isEmpty()) {
+            sql.append(" AND (metadata->>'documentId' IN (");
+            for (int i = 0; i < documentIds.size(); i++) {
+                if (i > 0) sql.append(", ");
+                sql.append("?");
+                params.add(documentIds.get(i).toString());
+            }
+            sql.append("))");
+        }
+
+        sql.append(" LIMIT ?");
+        params.add(limit);
+
+        List<Document> keywordDocs = new ArrayList<>();
+        jdbcTemplate.query(sql.toString(), (rs) -> {
+            String content = rs.getString("content");
+            String metaJson = rs.getString("metadata");
+            Map<String, Object> metadata = new HashMap<>();
+            if (metaJson != null && !metaJson.isBlank()) {
+                try {
+                    metadata = objectMapper.readValue(metaJson, new TypeReference<Map<String, Object>>() {});
+                } catch (Exception ignore) {}
+            }
+
+            // Calculate term match ratio
+            long matchedCount = terms.stream().filter(t -> content != null && content.toLowerCase().contains(t)).count();
+            if (matchedCount > 0) {
+                double matchRatio = (double) matchedCount / terms.size();
+                double computedScore = Math.min(0.95, 0.50 + (matchRatio * 0.40));
+                metadata.put("similarityScore", computedScore);
+                metadata.put("matchType", "KEYWORD");
+                keywordDocs.add(new Document(content, metadata));
+            }
+        }, params.toArray());
+
+        log.info("Keyword search retrieved {} chunks for terms: {}", keywordDocs.size(), terms);
+        return keywordDocs;
+    }
+
+    private boolean isStopword(String word) {
+        if (word == null || word.length() < 3) return true;
+        return STOPWORDS.contains(word.toLowerCase());
+    }
+
+    /**
+     * Reciprocal Rank Fusion (RRF) for merging and deduplicating semantic and keyword matches
+     */
+    private List<Document> fuseAndRerankResults(List<Document> vectorDocs, List<Document> keywordDocs, int topK) {
+        Map<String, Document> docByContent = new LinkedHashMap<>();
+        Map<String, Double> rrfScores = new HashMap<>();
+        final double K = 60.0;
+
+        for (int i = 0; i < vectorDocs.size(); i++) {
+            Document doc = vectorDocs.get(i);
+            String key = normalizeContent(doc.getText());
+            docByContent.putIfAbsent(key, doc);
+            rrfScores.put(key, rrfScores.getOrDefault(key, 0.0) + (1.0 / (K + (i + 1))));
+        }
+
+        for (int i = 0; i < keywordDocs.size(); i++) {
+            Document doc = keywordDocs.get(i);
+            String key = normalizeContent(doc.getText());
+            docByContent.putIfAbsent(key, doc);
+            rrfScores.put(key, rrfScores.getOrDefault(key, 0.0) + (1.0 / (K + (i + 1))));
+        }
+
+        return rrfScores.entrySet().stream()
+                .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
+                .limit(topK)
+                .map(entry -> docByContent.get(entry.getKey()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    private String normalizeContent(String text) {
+        if (text == null) return "";
+        return text.trim().replaceAll("\\s+", " ").toLowerCase();
     }
 
     /**

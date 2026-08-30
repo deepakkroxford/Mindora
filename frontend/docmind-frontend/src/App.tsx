@@ -9,6 +9,7 @@ import Sidebar from './components/Sidebar';
 import ChatView from './components/ChatView';
 import SearchView from './components/SearchView';
 import ChunksView from './components/ChunksView';
+import GuideView from './components/GuideView';
 import UploadDialog from './components/UploadDialog';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -35,6 +36,7 @@ const ProtectedLayout: React.FC = () => {
           {activeTab === 'chat' && <ChatView />}
           {activeTab === 'search' && <SearchView />}
           {activeTab === 'chunks' && <ChunksView />}
+          {activeTab === 'guide' && <GuideView onUploadClick={() => setIsUploadOpen(true)} />}
         </main>
       </div>
 

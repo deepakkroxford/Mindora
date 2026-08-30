@@ -4,7 +4,8 @@ import {
   Zap, Sparkles, RotateCcw, Square, Copy, Check, Wifi, WifiOff,
   AlertTriangle, ThumbsUp, ThumbsDown, MoreHorizontal, MessageSquare, Globe,
   HelpCircle, Lightbulb, Compass, FileCheck, BarChart3, Cpu, Target,
-  Download, FileCode, Edit2,
+  Download, FileCode, Edit2, ShieldAlert, Mic, MicOff, Volume2, VolumeX,
+  ExternalLink,
 } from 'lucide-react';
 import { chatApi } from '../services/api';
 import { useApp } from '../context/AppContext';
@@ -12,6 +13,7 @@ import type { Message, CitationDto } from '../types';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import ChatAnalyticsModal from './ChatAnalyticsModal';
+import CitationDetailModal from './CitationDetailModal';
 
 /* ─── Default Welcome Message from Mindora AI ──────────────────── */
 const WELCOME_MESSAGE: Message = {
@@ -184,7 +186,11 @@ function renderMarkdown(content: string): React.ReactNode[] {
 }
 
 /* ─── Citation card ─────────────────────────────────────────────── */
-const CitationCard: React.FC<{ citation: CitationDto; index: number }> = ({ citation, index }) => {
+const CitationCard: React.FC<{
+  citation: CitationDto;
+  index: number;
+  onInspect?: (citation: CitationDto, index: number) => void;
+}> = ({ citation, index, onInspect }) => {
   const [expanded, setExpanded] = useState(false);
   const score = citation.similarityScore ?? 0;
   const pct = (score * 100).toFixed(0);
@@ -193,31 +199,43 @@ const CitationCard: React.FC<{ citation: CitationDto; index: number }> = ({ cita
 
   return (
     <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-900/60 hover:border-slate-700 transition-all duration-150">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2.5 p-2.5 text-left hover:bg-slate-800/30 transition-colors"
-      >
-        <span className="flex-shrink-0 w-5 h-5 bg-teal-500/15 text-teal-400 rounded-md text-[10px] flex items-center justify-center font-bold border border-teal-500/25">
-          {index + 1}
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <FileText className="w-3 h-3 flex-shrink-0 text-teal-400" />
-            <p className="text-xs text-slate-200 font-medium truncate">{citation.fileName}</p>
-            {citation.pageNumber && (
-              <span className="text-[10px] text-slate-500 flex-shrink-0 bg-slate-800 px-1 rounded">p.{citation.pageNumber}</span>
-            )}
-          </div>
-          {/* Similarity progress */}
-          <div className="flex items-center gap-2 mt-1">
-            <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
-              <div className={clsx('h-1 rounded-full transition-all duration-300', barColor)} style={{ width: `${pct}%` }} />
+      <div className="flex items-center justify-between p-2.5 hover:bg-slate-800/30 transition-colors">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex-1 flex items-center gap-2.5 text-left min-w-0"
+        >
+          <span className="flex-shrink-0 w-5 h-5 bg-teal-500/15 text-teal-400 rounded-md text-[10px] flex items-center justify-center font-bold border border-teal-500/25">
+            {index + 1}
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <FileText className="w-3 h-3 flex-shrink-0 text-teal-400" />
+              <p className="text-xs text-slate-200 font-medium truncate">{citation.fileName}</p>
+              {citation.pageNumber && (
+                <span className="text-[10px] text-slate-500 flex-shrink-0 bg-slate-800 px-1 rounded">p.{citation.pageNumber}</span>
+              )}
             </div>
-            <span className={clsx('text-[10px] font-bold flex-shrink-0 font-mono', textColor)}>{pct}%</span>
+            {/* Similarity progress */}
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden max-w-40">
+                <div className={clsx('h-1 rounded-full transition-all duration-300', barColor)} style={{ width: `${pct}%` }} />
+              </div>
+              <span className={clsx('text-[10px] font-bold flex-shrink-0 font-mono', textColor)}>{pct}%</span>
+            </div>
           </div>
-        </div>
-        {expanded ? <ChevronUp className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />}
-      </button>
+          {expanded ? <ChevronUp className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />}
+        </button>
+
+        {onInspect && (
+          <button
+            onClick={() => onInspect(citation, index)}
+            className="p-1 text-slate-500 hover:text-teal-400 hover:bg-slate-800 rounded transition-colors ml-2 flex-shrink-0"
+            title="Inspect citation details"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
       {expanded && (
         <div className="px-3 pb-3 pt-2 border-t border-slate-800 bg-[#070b14] animate-fade-in">
           <p className="text-xs text-slate-300 leading-relaxed font-mono">{citation.snippet}</p>
@@ -233,6 +251,7 @@ interface MessageBubbleProps {
   isLastAssistant?: boolean;
   onRegenerate?: (msg: Message) => void;
   onEditPrompt?: (text: string) => void;
+  onInspectCitation?: (citation: CitationDto, index: number) => void;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -240,6 +259,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   isLastAssistant,
   onRegenerate,
   onEditPrompt,
+  onInspectCitation,
 }) => {
   const isUser = message.role === 'user';
   const isWelcome = message.id === 'mindora-welcome-message';
@@ -261,6 +281,36 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       setFeedback(type);
       toast.success(type === 'like' ? 'Thanks for your feedback!' : 'Feedback noted. We will keep improving!');
     }
+  };
+
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const cleanMarkdownForSpeech = (text: string) => {
+    return text
+      .replace(/[*#_`~[\]()]/g, '')
+      .replace(/>/g, '')
+      .replace(/ℹ️|\*|⚠️|🛡️|📊|📚/g, '')
+      .trim();
+  };
+
+  const handleSpeak = () => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      toast.error('Text-to-speech is not supported in this browser.');
+      return;
+    }
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(cleanMarkdownForSpeech(message.content));
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
   };
 
   if (isUser) {
@@ -336,21 +386,32 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   </span>
                 )}
 
-                {/* Similarity Score */}
+                {/* Similarity Score or Guardrail Mode */}
                 {message.similarityScore != null && (
                   <span
                     className={clsx(
                       'inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono border',
                       message.similarityScore >= 0.8
                         ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                        : message.similarityScore >= 0.6
+                        : message.similarityScore >= 0.68
+                        ? 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
+                        : message.similarityScore >= 0.58
                         ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-                        : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                        : 'text-amber-300 bg-amber-500/15 border-amber-500/30'
                     )}
-                    title={`Cosine Vector Similarity: ${message.similarityScore.toFixed(4)}`}
+                    title={message.similarityScore < 0.58 ? 'Guardrail Active: Low document similarity (<58%)' : `Hybrid Vector Match: ${(message.similarityScore * 100).toFixed(1)}%`}
                   >
-                    <Target className="w-2.5 h-2.5" />
-                    {(message.similarityScore * 100).toFixed(0)}% match
+                    {message.similarityScore < 0.58 ? (
+                      <>
+                        <ShieldAlert className="w-2.5 h-2.5 text-amber-400" />
+                        <span>General Mode ({(message.similarityScore * 100).toFixed(0)}%)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Target className="w-2.5 h-2.5" />
+                        <span>{(message.similarityScore * 100).toFixed(0)}% match</span>
+                      </>
+                    )}
                   </span>
                 )}
               </div>
@@ -394,6 +455,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 )}
 
                 <button
+                  onClick={handleSpeak}
+                  className={clsx(
+                    'p-1 rounded transition-colors',
+                    isSpeaking ? 'text-teal-300 bg-teal-500/20 animate-pulse' : 'text-slate-500 hover:text-teal-300 hover:bg-slate-800'
+                  )}
+                  title={isSpeaking ? 'Stop reading' : 'Read aloud'}
+                >
+                  {isSpeaking ? <VolumeX className="w-3 h-3 text-rose-400" /> : <Volume2 className="w-3 h-3" />}
+                </button>
+
+                <button
                   onClick={handleCopy}
                   className="flex items-center gap-1 text-slate-400 hover:text-slate-200 p-1 hover:bg-slate-800 rounded transition-colors"
                   title="Copy response"
@@ -421,7 +493,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             {showCitations && (
               <div className="mt-2 space-y-1.5 animate-fade-in max-w-xl">
                 {message.citations.map((c, i) => (
-                  <CitationCard key={i} citation={c} index={i} />
+                  <CitationCard key={i} citation={c} index={i} onInspect={onInspectCitation} />
                 ))}
               </div>
             )}
@@ -453,6 +525,10 @@ const ChatView: React.FC = () => {
   const {
     selectedDocumentId,
     setSelectedDocumentId,
+    selectedDocumentIds,
+    toggleDocumentSelection,
+    selectAllDocuments,
+    clearDocumentSelection,
     documents,
     selectedConversationId,
     setSelectedConversationId,
@@ -469,11 +545,74 @@ const ChatView: React.FC = () => {
   const [showTemplates, setShowTemplates] = useState(true);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showDocScopeMenu, setShowDocScopeMenu] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [inspectingCitation, setInspectingCitation] = useState<{ citation: CitationDto; index: number } | null>(null);
+  const recognitionRef = useRef<any>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const selectedDoc = documents.find((d) => d.id === selectedDocumentId);
+
+  const toggleListening = () => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error('Voice recognition is not supported in this browser. Please use Chrome or Edge.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      const initialText = input;
+      recognition.onstart = () => {
+        setIsListening(true);
+        toast('🎙️ Listening... speak into your microphone', { duration: 2500, icon: '🎙️' });
+      };
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        const combined = initialText ? `${initialText} ${transcript.trim()}` : transcript.trim();
+        setInput(combined);
+        if (inputRef.current) {
+          inputRef.current.style.height = 'auto';
+          inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 128)}px`;
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          toast.error('Microphone permission denied. Please allow microphone access in your browser.');
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
+    } catch (err) {
+      console.error('Failed to start speech recognition', err);
+      setIsListening(false);
+    }
+  };
 
   // Load past conversation messages when a history item is selected
   useEffect(() => {
@@ -546,6 +685,7 @@ const ChatView: React.FC = () => {
         body: JSON.stringify({
           question,
           documentId: selectedDocumentId ?? undefined,
+          documentIds: selectedDocumentIds.length > 0 ? selectedDocumentIds : undefined,
           topK: 5,
           conversationId,
         }),
@@ -604,7 +744,7 @@ const ChatView: React.FC = () => {
       setIsStreaming(false);
       abortRef.current = null;
     }
-  }, [selectedDocumentId, conversationId, fetchConversations]);
+  }, [selectedDocumentId, selectedDocumentIds, conversationId, fetchConversations]);
 
   /* ── Normal query handler ── */
   const sendNormal = useCallback(async (question: string) => {
@@ -613,6 +753,7 @@ const ChatView: React.FC = () => {
       const res = await chatApi.query({
         question,
         documentId: selectedDocumentId ?? undefined,
+        documentIds: selectedDocumentIds.length > 0 ? selectedDocumentIds : undefined,
         topK: 5,
         conversationId,
       });
@@ -885,6 +1026,7 @@ const ChatView: React.FC = () => {
               isLastAssistant={msg.role === 'assistant' && index === messages.length - 1}
               onRegenerate={handleRegenerate}
               onEditPrompt={handleEditPrompt}
+              onInspectCitation={(citation, idx) => setInspectingCitation({ citation, index: idx })}
             />
           ))}
 
@@ -901,17 +1043,85 @@ const ChatView: React.FC = () => {
             {/* Mini Toolbar */}
             <div className="flex items-center justify-between pb-2 px-1 text-xs text-slate-400 border-b border-slate-800/60 mb-2 flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                {selectedDoc ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] text-teal-300 bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded-md">
-                    <FileText className="w-3 h-3 text-teal-400" />
-                    <span className="truncate max-w-[140px]">{selectedDoc.filename}</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-md">
-                    <Globe className="w-3 h-3 text-slate-400" />
-                    <span>All Documents ({documents.length})</span>
-                  </span>
-                )}
+                {/* Multi-Document Scope Selector Pill */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowDocScopeMenu(!showDocScopeMenu)}
+                    className={clsx(
+                      'inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md transition-all border font-medium',
+                      selectedDocumentIds.length > 0
+                        ? 'text-teal-300 bg-teal-500/10 border-teal-500/30 hover:bg-teal-500/20'
+                        : 'text-slate-400 bg-slate-800/80 border-slate-700/80 hover:text-slate-200'
+                    )}
+                    title="Click to scope specific documents for comparison or focused Q&A"
+                  >
+                    {selectedDocumentIds.length === 1 && selectedDoc ? (
+                      <>
+                        <FileText className="w-3 h-3 text-teal-400" />
+                        <span className="truncate max-w-[130px]">{selectedDoc.filename}</span>
+                      </>
+                    ) : selectedDocumentIds.length > 1 ? (
+                      <>
+                        <FileText className="w-3 h-3 text-teal-400" />
+                        <span>{selectedDocumentIds.length} Docs Scoped (Multi-RAG)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="w-3 h-3 text-slate-400" />
+                        <span>All Documents ({documents.length})</span>
+                      </>
+                    )}
+                    <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                  </button>
+
+                  {showDocScopeMenu && (
+                    <div className="absolute left-0 bottom-full mb-1.5 w-64 bg-[#0f172a] border border-slate-700/90 rounded-xl shadow-2xl py-2 z-40 animate-fade-in glass-panel max-h-60 overflow-y-auto">
+                      <div className="flex items-center justify-between px-3 pb-1.5 mb-1 border-b border-slate-800 text-[10px] text-slate-400">
+                        <span className="font-semibold uppercase tracking-wider">Scope Documents</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={selectAllDocuments}
+                            className="text-teal-400 hover:underline"
+                          >
+                            All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={clearDocumentSelection}
+                            className="text-slate-400 hover:text-slate-200 hover:underline"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                      {documents.length === 0 ? (
+                        <p className="px-3 py-2 text-xs text-slate-500">No documents uploaded yet</p>
+                      ) : (
+                        documents.map((d) => {
+                          const checked = selectedDocumentIds.includes(d.id);
+                          return (
+                            <label
+                              key={d.id}
+                              className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-800/60 cursor-pointer text-xs transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleDocumentSelection(d.id)}
+                                className="w-3.5 h-3.5 rounded border-slate-700 text-teal-500 accent-teal-500 cursor-pointer"
+                              />
+                              <span className="truncate text-slate-200" title={d.filename}>
+                                {d.filename}
+                              </span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Streaming Pill Switch */}
                 <button
@@ -1010,8 +1220,10 @@ const ChatView: React.FC = () => {
                 placeholder={
                   isBusy
                     ? 'Mindora is generating response…'
-                    : selectedDoc
+                    : selectedDocumentIds.length === 1 && selectedDoc
                     ? `Ask anything about "${selectedDoc.filename}"…`
+                    : selectedDocumentIds.length > 1
+                    ? `Ask questions across ${selectedDocumentIds.length} scoped documents…`
                     : 'Ask any question across your document base…'
                 }
                 rows={1}
@@ -1024,6 +1236,22 @@ const ChatView: React.FC = () => {
                   t.style.height = `${Math.min(t.scrollHeight, 128)}px`;
                 }}
               />
+
+              {/* Voice Microphone Input Button */}
+              <button
+                type="button"
+                onClick={toggleListening}
+                disabled={isBusy}
+                className={clsx(
+                  'flex-shrink-0 p-2.5 rounded-full transition-all duration-200',
+                  isListening
+                    ? 'bg-rose-500/25 text-rose-400 border border-rose-500/50 animate-pulse ring-2 ring-rose-500/40 shadow-lg shadow-rose-500/20'
+                    : 'text-slate-400 hover:text-teal-300 hover:bg-slate-800'
+                )}
+                title={isListening ? 'Stop listening' : 'Voice input (Speech to Text)'}
+              >
+                {isListening ? <MicOff className="w-4 h-4 text-rose-400" /> : <Mic className="w-4 h-4" />}
+              </button>
 
               {/* Action Button */}
               {isStreaming ? (
@@ -1062,6 +1290,14 @@ const ChatView: React.FC = () => {
           conversations.find((c) => c.id === conversationId)?.title ||
           (selectedDoc ? selectedDoc.filename : 'Workspace Chat')
         }
+      />
+
+      {/* ── Deep-Dive Citation Detail Modal ── */}
+      <CitationDetailModal
+        isOpen={!!inspectingCitation}
+        onClose={() => setInspectingCitation(null)}
+        citation={inspectingCitation?.citation ?? null}
+        citationIndex={inspectingCitation?.index}
       />
     </div>
   );
