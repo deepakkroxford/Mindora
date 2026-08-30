@@ -2,7 +2,6 @@ package com.substring.docmind.controller;
 
 import com.substring.docmind.dto.*;
 import com.substring.docmind.service.RagService;
-import io.micrometer.core.instrument.search.Search;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -10,8 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
-
-import javax.naming.directory.SearchResult;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -95,6 +92,21 @@ public class ChatController {
                                 ApiResponse.<Void>builder()
                                                 .success(true)
                                                 .message("Conversation deleted successfully")
+                                                .timestamp(LocalDateTime.now())
+                                                .build());
+        }
+
+        @PatchMapping("/conversations/{conversationId}")
+        @Operation(summary = "Rename or update a conversation title")
+        public ResponseEntity<ApiResponse<ConversationDto>> updateConversation(
+                        @PathVariable UUID conversationId,
+                        @Valid @RequestBody UpdateConversationDto dto) {
+                ConversationDto updated = ragService.updateConversationTitle(conversationId, dto.getTitle());
+                return ResponseEntity.ok(
+                                ApiResponse.<ConversationDto>builder()
+                                                .success(true)
+                                                .message("Conversation updated successfully")
+                                                .data(updated)
                                                 .timestamp(LocalDateTime.now())
                                                 .build());
         }
