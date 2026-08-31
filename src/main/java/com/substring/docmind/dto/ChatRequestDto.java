@@ -32,4 +32,5 @@ public class ChatRequestDto {
     @Pattern(regexp = "^[a-zA-Z0-9-]*$", message = "Conversation ID must contain only alphanumeric characters and hyphens")
     private String conversationId;
 
+    private Boolean bypassCache;
 }

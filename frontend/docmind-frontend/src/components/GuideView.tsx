@@ -63,6 +63,13 @@ const GuideView: React.FC<GuideViewProps> = ({ onUploadClick }) => {
       tagColor: "bg-purple-500/10 text-purple-400 border-purple-500/20",
       title: "Persistent Multi-Turn Chat History & Conversational Memory",
       desc: "Full conversation persistence in PostgreSQL (conversations & chat_messages tables). Automatically feeds recent dialogue turns into LLM context for seamless follow-up inquiries with async AI title generation."
+    },
+    {
+      icon: <Zap className="w-5 h-5 text-amber-400" />,
+      tag: "SEMANTIC CACHING & SCALE",
+      tagColor: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+      title: "Redis Semantic Cache & Distributed Rate Limiter",
+      desc: "Instantaneous <15ms response latency and $0 token cost for repeated or scoped queries using Redis key normalization. Enforces distributed token bucket rate limits (30 req/min) with automatic cache invalidation on file changes."
     }
   ];
 
@@ -180,6 +187,10 @@ const GuideView: React.FC<GuideViewProps> = ({ onUploadClick }) => {
               <span className="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-800">
                 <Clock className="w-3 h-3 text-purple-400" />
                 <span>Persistent Chat History</span>
+              </span>
+              <span className="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-800">
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Redis Semantic Cache (6379)</span>
               </span>
             </div>
           </div>

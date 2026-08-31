@@ -111,16 +111,14 @@
 			<version>0.12.3</version>
 			<scope>runtime</scope>
 		</dependency>
-		<!-- Rate Limiting -->
+		<!-- Spring Data Redis & Connection Pooling -->
 		<dependency>
-			<groupId>io.github.resilience4j</groupId>
-			<artifactId>resilience4j-spring-boot3</artifactId>
-			<version>2.1.0</version>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>io.github.resilience4j</groupId>
-			<artifactId>resilience4j-ratelimiter</artifactId>
-			<version>2.1.0</version>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-pool2</artifactId>
 		</dependency>
 
 		<dependency>

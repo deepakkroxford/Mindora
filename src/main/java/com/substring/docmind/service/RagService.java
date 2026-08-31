@@ -32,7 +32,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
-@RequiredArgsConstructor
 public class RagService {
     private static final Logger log = LoggerFactory.getLogger(RagService.class);
 
@@ -45,6 +44,34 @@ public class RagService {
     private final PlatformTransactionManager transactionManager;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final SemanticCacheService semanticCacheService;
+    private final RedisRateLimitingService redisRateLimitingService;
+
+    public RagService(
+            VectorStore vectorStore,
+            AppProperties appProperties,
+            ChatClient chatClient,
+            ConversationRepository conversationRepository,
+            ChatMessageRepository chatMessageRepository,
+            UserRepository userRepository,
+            PlatformTransactionManager transactionManager,
+            JdbcTemplate jdbcTemplate,
+            ObjectMapper objectMapper,
+            SemanticCacheService semanticCacheService,
+            RedisRateLimitingService redisRateLimitingService
+    ) {
+        this.vectorStore = vectorStore;
+        this.appProperties = appProperties;
+        this.chatClient = chatClient;
+        this.conversationRepository = conversationRepository;
+        this.chatMessageRepository = chatMessageRepository;
+        this.userRepository = userRepository;
+        this.transactionManager = transactionManager;
+        this.jdbcTemplate = jdbcTemplate;
+        this.objectMapper = objectMapper;
+        this.semanticCacheService = semanticCacheService;
+        this.redisRateLimitingService = redisRateLimitingService;
+    }
 
     /**
      * Approximate token estimation (~3.8 characters per token)
@@ -124,8 +151,15 @@ public class RagService {
             try {
                 User user = userRepository.findByEmail(email).orElse(null);
                 if (user == null) {
-                    log.warn("Cannot save conversation: user with email {} not found", email);
-                    return null;
+                    user = User.builder()
+                            .email(email)
+                            .name(email.contains("@") ? email.split("@")[0] : email)
+                            .password("AUTO_PROVISIONED")
+                            .role("USER")
+                            .enabled(true)
+                            .build();
+                    user = userRepository.saveAndFlush(user);
+                    log.info("Auto-provisioned user record for email: {}", email);
                 }
 
                 UUID conversationUuid = null;
@@ -212,11 +246,36 @@ public class RagService {
     // to ask any thing related to document
     @Transactional
     public ChatResponseDto askQuestion(ChatRequestDto request) {
+        String email = SecurityContextHolder.getContext().getAuthentication() != null
+                ? SecurityContextHolder.getContext().getAuthentication().getName()
+                : "anonymous";
+
+        // 1. Enforce distributed rate limiting
+        if (!redisRateLimitingService.tryAcquireChat(email)) {
+            throw new com.substring.docmind.exception.RateLimitExceededException("⏳ You're asking questions too quickly! Please wait a minute and try again.");
+        }
+
+        List<UUID> effectiveDocIds = resolveEffectiveDocIds(request.getDocumentId(), request.getDocumentIds());
+
+        // 2. Check Redis Semantic / Exact Response Cache (<15ms hit) unless bypassCache is requested (e.g. Regenerate)
+        boolean shouldBypassCache = Boolean.TRUE.equals(request.getBypassCache());
+        if (!shouldBypassCache) {
+            Optional<ChatResponseDto> cachedOpt = semanticCacheService.getCachedResponse(request.getQuestion(), effectiveDocIds);
+            if (cachedOpt.isPresent()) {
+                ChatResponseDto cached = cachedOpt.get();
+                Conversation savedConv = saveConversationAndMessage(
+                        email, request, cached.getAnswer(), cached.getCitations(),
+                        cached.getPromptTokens(), cached.getCompletionTokens(), cached.getTotalTokens());
+                if (savedConv != null) {
+                    cached.setConversationId(savedConv.getId().toString());
+                }
+                return cached;
+            }
+        }
 
         long startTime = System.currentTimeMillis();
-        List<UUID> effectiveDocIds = resolveEffectiveDocIds(request.getDocumentId(), request.getDocumentIds());
-        log.info("Processing query: '{}', scoped documentIds: {}, conversationId: {}", 
-                request.getQuestion(), effectiveDocIds, request.getConversationId());
+        log.info("Processing live query (bypassCache={}): '{}', scoped documentIds: {}, conversationId: {}", 
+                shouldBypassCache, request.getQuestion(), effectiveDocIds, request.getConversationId());
 
         List<Document> similarDocuments = this.retrieveRelevantDocuments(request.getQuestion(), effectiveDocIds,
                 request.getTopK(), request.getMinSimilarity());
@@ -266,14 +325,10 @@ public class RagService {
         }
         int totalTokens = promptTokens + completionTokens;
 
-        // Get current authenticated user and save history
-        String email = SecurityContextHolder.getContext().getAuthentication() != null
-                ? SecurityContextHolder.getContext().getAuthentication().getName()
-                : null;
         Conversation savedConv = saveConversationAndMessage(email, request, answer, citationDtos, promptTokens, completionTokens, totalTokens);
         String convIdResult = savedConv != null ? savedConv.getId().toString() : request.getConversationId();
 
-        return ChatResponseDto.builder()
+        ChatResponseDto finalResponse = ChatResponseDto.builder()
                 .answer(answer)
                 .conversationId(convIdResult)
                 .citations(citationDtos)
@@ -282,12 +337,40 @@ public class RagService {
                 .promptTokens(promptTokens)
                 .completionTokens(completionTokens)
                 .totalTokens(totalTokens)
+                .isCached(false)
                 .build();
+
+        // 3. Save / overwrite in Redis Cache (2 Hour TTL)
+        semanticCacheService.cacheResponse(request.getQuestion(), effectiveDocIds, finalResponse);
+
+        return finalResponse;
     }
 
     // this streams
     public Flux<String> streamQuestionAnswer(ChatRequestDto requestDto) {
+        final String email = SecurityContextHolder.getContext().getAuthentication() != null
+                ? SecurityContextHolder.getContext().getAuthentication().getName()
+                : "anonymous";
+
+        // 1. Enforce distributed rate limiting
+        if (!redisRateLimitingService.tryAcquireChat(email)) {
+            return Flux.error(new com.substring.docmind.exception.RateLimitExceededException("⏳ You're asking questions too quickly! Please wait a minute and try again."));
+        }
+
         List<UUID> effectiveDocIds = resolveEffectiveDocIds(requestDto.getDocumentId(), requestDto.getDocumentIds());
+
+        // 2. Check Redis Cache for Instant Stream unless bypassCache is requested
+        boolean shouldBypassCache = Boolean.TRUE.equals(requestDto.getBypassCache());
+        if (!shouldBypassCache) {
+            Optional<ChatResponseDto> cachedOpt = semanticCacheService.getCachedResponse(requestDto.getQuestion(), effectiveDocIds);
+            if (cachedOpt.isPresent()) {
+                ChatResponseDto cached = cachedOpt.get();
+                saveConversationAndMessage(email, requestDto, cached.getAnswer(),
+                        cached.getCitations(), cached.getPromptTokens(), cached.getCompletionTokens(), cached.getTotalTokens());
+                return Flux.just(cached.getAnswer());
+            }
+        }
+
         log.info("Streaming query: '{}', scoped documentIds: {}, conversationId: {}", 
                 requestDto.getQuestion(), effectiveDocIds, requestDto.getConversationId());
 
@@ -316,10 +399,6 @@ public class RagService {
         String conversationHistory = buildConversationHistoryString(requestDto.getConversationId());
         String userPrompt = buildPrompt(requestDto.getQuestion(), contextText, conversationHistory, isLowRelevance);
 
-        final String email = SecurityContextHolder.getContext().getAuthentication() != null
-                ? SecurityContextHolder.getContext().getAuthentication().getName()
-                : null;
-
         final int promptTokens = estimateTokens(userPrompt);
         StringBuilder fullAnswer = new StringBuilder();
 
@@ -329,16 +408,31 @@ public class RagService {
                 .content()
                 .doOnNext(token -> fullAnswer.append(token))
                 .doOnComplete(() -> {
+                    String answer = fullAnswer.toString();
+                    int completionTokens = estimateTokens(answer);
+                    int totalTokens = promptTokens + completionTokens;
+
                     if (email != null && !email.equals("anonymousUser")) {
                         try {
-                            String answer = fullAnswer.toString();
-                            int completionTokens = estimateTokens(answer);
-                            int totalTokens = promptTokens + completionTokens;
                             saveConversationAndMessage(email, requestDto, answer, citationDtos, promptTokens, completionTokens, totalTokens);
                         } catch (Exception e) {
                             log.error("Failed to save streaming message to conversation history for user {}", email, e);
                         }
                     }
+
+                    // Cache streaming response in Redis
+                    ChatResponseDto toCache = ChatResponseDto.builder()
+                            .answer(answer)
+                            .conversationId(requestDto.getConversationId())
+                            .citations(citationDtos)
+                            .responseTimeMs(0L)
+                            .similarityScore(topSimilarityScore)
+                            .promptTokens(promptTokens)
+                            .completionTokens(completionTokens)
+                            .totalTokens(totalTokens)
+                            .isCached(true)
+                            .build();
+                    semanticCacheService.cacheResponse(requestDto.getQuestion(), effectiveDocIds, toCache);
                 });
     }
 
@@ -752,12 +846,17 @@ public class RagService {
      */
     @Transactional(readOnly = true)
     public List<ConversationDto> getConversations() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        String email = SecurityContextHolder.getContext().getAuthentication() != null
+                ? SecurityContextHolder.getContext().getAuthentication().getName()
+                : null;
         if (email == null || email.equals("anonymousUser")) {
             return Collections.emptyList();
         }
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            log.debug("No user entity found for email: {}", email);
+            return Collections.emptyList();
+        }
 
         return conversationRepository.findByUserIdOrderByUpdatedAtDesc(user.getId()).stream()
                 .map(conv -> ConversationDto.builder()
@@ -776,15 +875,22 @@ public class RagService {
      */
     @Transactional(readOnly = true)
     public List<ChatMessageDto> getMessages(UUID conversationId) {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        String email = SecurityContextHolder.getContext().getAuthentication() != null
+                ? SecurityContextHolder.getContext().getAuthentication().getName()
+                : null;
         if (email == null || email.equals("anonymousUser")) {
             return Collections.emptyList();
         }
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            return Collections.emptyList();
+        }
 
         Conversation conversation = conversationRepository.findByIdAndUserId(conversationId, user.getId())
-                .orElseThrow(() -> new IllegalArgumentException("Conversation not found or access denied"));
+                .orElse(null);
+        if (conversation == null) {
+            return Collections.emptyList();
+        }
 
         return chatMessageRepository.findByConversationIdOrderByCreatedAtAsc(conversation.getId()).stream()
                 .map(msg -> ChatMessageDto.builder()

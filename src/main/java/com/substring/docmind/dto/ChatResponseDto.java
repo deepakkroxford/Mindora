@@ -18,4 +18,5 @@ public class ChatResponseDto {
     private Integer promptTokens;
     private Integer completionTokens;
     private Integer totalTokens;
+    private Boolean isCached;
 }

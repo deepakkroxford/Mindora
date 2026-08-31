@@ -48,6 +48,7 @@ export interface ChatRequestDto {
   topK?: number;
   minSimilarity?: number;
   conversationId?: string;
+  bypassCache?: boolean;
 }
 
 export interface ChatResponseDto {
@@ -59,6 +60,7 @@ export interface ChatResponseDto {
   promptTokens?: number | null;
   completionTokens?: number | null;
   totalTokens?: number | null;
+  isCached?: boolean;
 }
 
 export interface SearchRequestDto {
@@ -140,6 +142,7 @@ export interface Message {
   promptTokens?: number | null;
   completionTokens?: number | null;
   totalTokens?: number | null;
+  isCached?: boolean;
   timestamp: Date;
   isStreaming?: boolean;
 }

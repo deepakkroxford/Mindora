@@ -31,7 +31,7 @@ public enum ErrorCode {
     CHAT_FAILED("4224", "Chat request failed"),
 
     // Rate limiting (4291-4299)
-    RATE_LIMIT_EXCEEDED("4291", "Rate limit exceeded. Please try again later"),
+    RATE_LIMIT_EXCEEDED("4291", "You're sending requests too quickly! Please wait a minute and try again."),
 
     // Server errors (5001-5099)
     INTERNAL_SERVER_ERROR("5001", "Internal server error"),
