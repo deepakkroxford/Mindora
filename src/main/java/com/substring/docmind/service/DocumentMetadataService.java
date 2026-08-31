@@ -33,6 +33,7 @@ public class DocumentMetadataService {
     private final DocumentMetadataRepo documentMetadataRepo;
     private final DocumentParserService parserService;
     private final DocumentIngestionService ingestionService;
+    private final DiagramExtractionService diagramExtractionService;
     private final ModelMapper modelMapper;
     private final JdbcTemplate jdbcTemplate;
     private final SemanticCacheService semanticCacheService;
@@ -42,6 +43,7 @@ public class DocumentMetadataService {
             DocumentMetadataRepo documentMetadataRepo,
             DocumentParserService parserService,
             DocumentIngestionService ingestionService,
+            DiagramExtractionService diagramExtractionService,
             ModelMapper modelMapper,
             JdbcTemplate jdbcTemplate,
             SemanticCacheService semanticCacheService,
@@ -49,6 +51,7 @@ public class DocumentMetadataService {
         this.documentMetadataRepo = documentMetadataRepo;
         this.parserService = parserService;
         this.ingestionService = ingestionService;
+        this.diagramExtractionService = diagramExtractionService;
         this.modelMapper = modelMapper;
         this.jdbcTemplate = jdbcTemplate;
         this.semanticCacheService = semanticCacheService;
@@ -86,6 +89,9 @@ public class DocumentMetadataService {
         int chunksCreated = 0;
 
         try {
+            // Extract architecture diagrams/charts if PDF
+            diagramExtractionService.extractAndSaveDiagrams(documentMetadata, file);
+
             // parse the file
             parsedDocs = parserService.parse(file);
 

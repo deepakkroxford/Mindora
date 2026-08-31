@@ -22,6 +22,7 @@ import type {
   MindMapNodeDto,
   MindMapResponseDto,
   MindMapGenerationRequestDto,
+  DocumentDiagramDto,
 } from '../types';
 
 const api = axios.create({
@@ -172,6 +173,14 @@ export const chatApi = {
 
   getDocumentStarterPrompts: async (documentId: string): Promise<ApiResponse<string[]>> => {
     const { data } = await api.get<ApiResponse<string[]>>(`/chat/suggestions/document/${documentId}`);
+    return data;
+  },
+};
+
+// Diagram APIs
+export const diagramApi = {
+  getByDocument: async (documentId: string): Promise<ApiResponse<DocumentDiagramDto[]>> => {
+    const { data } = await api.get<ApiResponse<DocumentDiagramDto[]>>(`/diagrams/document/${documentId}`);
     return data;
   },
 };

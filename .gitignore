@@ -36,3 +36,6 @@ build/
 .env
 application.properties
 application-dev.properties
+uploads/
+*.DS_Store
+temp_diagram.jpg

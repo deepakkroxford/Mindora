@@ -2,6 +2,8 @@ package com.substring.docmind.dto;
 
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -19,4 +21,7 @@ public class CitationDto {
     private String snippet;
     private Double similarityScore;
     private Map<String, Object> metadata;
+
+    @Builder.Default
+    private List<DocumentDiagramDto> diagrams = new ArrayList<>();
 }
