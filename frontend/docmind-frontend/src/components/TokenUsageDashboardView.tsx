@@ -185,7 +185,7 @@ const TokenUsageDashboardView: React.FC = () => {
     if (!data?.categoryBreakdown) return [];
     return [
       { name: 'Chat Assistant', key: 'CHAT', value: data.categoryBreakdown['CHAT']?.totalTokens || 0, color: '#06b6d4' },
-      { name: 'Mind Map', key: 'MINDMAP', value: data.categoryBreakdown['MINDMAP']?.totalTokens || 0, color: '#14b8a6' },
+      { name: 'Concept Mind Map', key: 'MINDMAP', value: data.categoryBreakdown['MINDMAP']?.totalTokens || 0, color: '#f59e0b' },
       { name: 'Quiz & Study', key: 'QUIZ', value: data.categoryBreakdown['QUIZ']?.totalTokens || 0, color: '#a855f7' }
     ].filter(item => item.value > 0);
   }, [data]);
@@ -206,11 +206,11 @@ const TokenUsageDashboardView: React.FC = () => {
       key: 'MINDMAP',
       label: 'Concept Mind Map',
       icon: Brain,
-      color: 'from-teal-500 to-emerald-500',
-      textColor: 'text-teal-400',
-      bgColor: 'bg-teal-500/10 border-teal-500/30',
-      glowColor: 'shadow-teal-500/20',
-      strokeColor: '#14b8a6',
+      color: 'from-amber-500 to-orange-500',
+      textColor: 'text-amber-400',
+      bgColor: 'bg-amber-500/10 border-amber-500/30',
+      glowColor: 'shadow-amber-500/20',
+      strokeColor: '#f59e0b',
       desc: 'Hierarchical concept graph extraction & taxonomy trees'
     },
     {
@@ -528,8 +528,8 @@ const TokenUsageDashboardView: React.FC = () => {
                           <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0}/>
                         </linearGradient>
                         <linearGradient id="mindMapGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.6}/>
-                          <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.0}/>
+                          <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.6}/>
+                          <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0}/>
                         </linearGradient>
                         <linearGradient id="quizGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#a855f7" stopOpacity={0.6}/>
@@ -541,7 +541,7 @@ const TokenUsageDashboardView: React.FC = () => {
                       <YAxis stroke="#64748b" tick={{ fontSize: 11 }} tickFormatter={(val: number) => formatNumber(val)} />
                       <Tooltip content={<CustomChartTooltip />} />
                       <Area type="monotone" dataKey="chatTokens" name="Chat Assistant" stroke="#06b6d4" strokeWidth={2.5} fillOpacity={1} fill="url(#chatGrad)" stackId="1" />
-                      <Area type="monotone" dataKey="mindMapTokens" name="Mind Map" stroke="#14b8a6" strokeWidth={2.5} fillOpacity={1} fill="url(#mindMapGrad)" stackId="1" />
+                      <Area type="monotone" dataKey="mindMapTokens" name="Mind Map" stroke="#f59e0b" strokeWidth={2.5} fillOpacity={1} fill="url(#mindMapGrad)" stackId="1" />
                       <Area type="monotone" dataKey="quizTokens" name="Quiz & Study" stroke="#a855f7" strokeWidth={2.5} fillOpacity={1} fill="url(#quizGrad)" stackId="1" />
                     </AreaChart>
                   ) : chartType === 'bar' ? (
@@ -551,7 +551,7 @@ const TokenUsageDashboardView: React.FC = () => {
                       <YAxis stroke="#64748b" tick={{ fontSize: 11 }} tickFormatter={(val: number) => formatNumber(val)} />
                       <Tooltip content={<CustomChartTooltip />} />
                       <Bar dataKey="chatTokens" name="Chat Assistant" fill="#06b6d4" stackId="a" radius={[0, 0, 4, 4]} />
-                      <Bar dataKey="mindMapTokens" name="Mind Map" fill="#14b8a6" stackId="a" />
+                      <Bar dataKey="mindMapTokens" name="Mind Map" fill="#f59e0b" stackId="a" />
                       <Bar dataKey="quizTokens" name="Quiz & Study" fill="#a855f7" stackId="a" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   ) : (
@@ -561,7 +561,7 @@ const TokenUsageDashboardView: React.FC = () => {
                       <YAxis stroke="#64748b" tick={{ fontSize: 11 }} tickFormatter={(val: number) => formatNumber(val)} />
                       <Tooltip content={<CustomChartTooltip />} />
                       <Line type="monotone" dataKey="chatTokens" name="Chat Assistant" stroke="#06b6d4" strokeWidth={2.5} dot={false} activeDot={{ r: 6 }} />
-                      <Line type="monotone" dataKey="mindMapTokens" name="Mind Map" stroke="#14b8a6" strokeWidth={2.5} dot={false} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="mindMapTokens" name="Mind Map" stroke="#f59e0b" strokeWidth={2.5} dot={false} activeDot={{ r: 6 }} />
                       <Line type="monotone" dataKey="quizTokens" name="Quiz & Study" stroke="#a855f7" strokeWidth={2.5} dot={false} activeDot={{ r: 6 }} />
                     </LineChart>
                   )}
@@ -577,15 +577,15 @@ const TokenUsageDashboardView: React.FC = () => {
             <div className="flex items-center justify-center gap-6 pt-3 border-t border-slate-100 dark:border-slate-800/80 text-xs font-medium">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-cyan-500 shadow-sm shadow-cyan-500/50" />
-                <span className="text-slate-700 dark:text-slate-300">Chat Assistant</span>
+                <span className="text-slate-700 dark:text-slate-300">Chat Assistant (Cyan)</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-teal-500 shadow-sm shadow-teal-500/50" />
-                <span className="text-slate-700 dark:text-slate-300">Mind Map</span>
+                <span className="w-3 h-3 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50" />
+                <span className="text-slate-700 dark:text-slate-300">Mind Map (Amber)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-purple-500 shadow-sm shadow-purple-500/50" />
-                <span className="text-slate-700 dark:text-slate-300">Quiz & Study Hub</span>
+                <span className="text-slate-700 dark:text-slate-300">Quiz & Study Hub (Purple)</span>
               </div>
             </div>
           </div>
@@ -802,7 +802,7 @@ const TokenUsageDashboardView: React.FC = () => {
                             className={clsx(
                               'px-2.5 py-0.5 rounded-full font-bold text-[10px] border',
                               isChat && 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30 shadow-sm shadow-cyan-500/10',
-                              isMindMap && 'bg-teal-500/10 text-teal-400 border-teal-500/30 shadow-sm shadow-teal-500/10',
+                              isMindMap && 'bg-amber-500/10 text-amber-400 border-amber-500/30 shadow-sm shadow-amber-500/10',
                               isQuiz && 'bg-purple-500/10 text-purple-400 border-purple-500/30 shadow-sm shadow-purple-500/10',
                               !isChat && !isMindMap && !isQuiz && 'bg-slate-500/10 text-slate-400 border-slate-500/30'
                             )}

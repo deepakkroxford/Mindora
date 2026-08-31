@@ -316,17 +316,23 @@ public class TokenUsageService {
 
     private List<TokenEventDto> fetchHistoricalMindMapTokens(UUID userId, LocalDateTime since) {
         try {
-            String sql = "SELECT id, title, document_id, tokens_used, created_at FROM mind_map_records WHERE created_at >= ? ORDER BY created_at DESC";
+            String sql = "SELECT id, title, document_names, tokens_used, created_at FROM mindmap_records WHERE created_at >= ? ORDER BY created_at DESC";
             return jdbcTemplate.query(sql, (rs, rowNum) -> {
                 int t = rs.getInt("tokens_used");
+                if (t <= 0) t = 1200;
+                int p = (int) (t * 0.7);
+                int c = (int) (t * 0.3);
+                double cost = (p * PROMPT_COST_PER_TOKEN) + (c * COMPLETION_COST_PER_TOKEN);
+
                 return TokenEventDto.builder()
                         .id(rs.getObject("id", UUID.class))
                         .category("MINDMAP")
-                        .promptTokens((int) (t * 0.7))
-                        .completionTokens((int) (t * 0.3))
+                        .promptTokens(p)
+                        .completionTokens(c)
                         .totalTokens(t)
+                        .documentName(rs.getString("document_names"))
                         .description("Mind Map: " + rs.getString("title"))
-                        .estimatedCost(t * BLENDED_COST_PER_TOKEN)
+                        .estimatedCost(cost > 0 ? cost : t * BLENDED_COST_PER_TOKEN)
                         .createdAt(rs.getTimestamp("created_at").toLocalDateTime())
                         .build();
             }, since);

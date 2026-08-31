@@ -221,6 +221,16 @@ export const mindMapApi = {
     return data;
   },
 
+  saveMindMap: async (request: MindMapResponseDto): Promise<ApiResponse<MindMapResponseDto>> => {
+    const { data } = await api.post<ApiResponse<MindMapResponseDto>>('/mindmap/save', request);
+    return data;
+  },
+
+  updateMindMap: async (id: string, request: MindMapResponseDto): Promise<ApiResponse<MindMapResponseDto>> => {
+    const { data } = await api.put<ApiResponse<MindMapResponseDto>>(`/mindmap/${id}`, request);
+    return data;
+  },
+
   deleteMindMap: async (id: string): Promise<ApiResponse<void>> => {
     const { data } = await api.delete<ApiResponse<void>>(`/mindmap/${id}`);
     return data;

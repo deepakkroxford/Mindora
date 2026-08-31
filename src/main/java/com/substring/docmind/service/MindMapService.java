@@ -250,6 +250,64 @@ public class MindMapService {
     }
 
     /**
+     * Updates an existing MindMap in PostgreSQL with modified title or edited node tree.
+     */
+    public MindMapResponseDto updateMindMap(UUID id, MindMapResponseDto request, String userEmail) {
+        MindMapRecord record = mindMapRecordRepository.findById(id)
+                .orElseThrow(() -> new com.substring.docmind.exception.ResourceNotFoundException("Knowledge graph not found with id: " + id));
+
+        if (request.getTitle() != null && !request.getTitle().isBlank()) {
+            record.setTitle(request.getTitle());
+        }
+        if (request.getRootNode() != null) {
+            try {
+                String updatedJson = objectMapper.writeValueAsString(request.getRootNode());
+                record.setRootNodeJson(updatedJson);
+                record.setTotalNodes(countNodes(request.getRootNode()));
+            } catch (Exception e) {
+                log.error("Failed to serialize updated root node: {}", e.getMessage());
+            }
+        }
+        MindMapRecord saved = mindMapRecordRepository.save(record);
+        log.info("Updated MindMap record #{} with new title/content", id);
+        return mapRecordToDto(saved);
+    }
+
+    /**
+     * Saves a new custom or edited MindMap directly to PostgreSQL.
+     */
+    public MindMapResponseDto saveMindMap(MindMapResponseDto request, String userEmail) {
+        UUID userId = null;
+        if (userEmail != null && !userEmail.isBlank()) {
+            userId = userRepository.findByEmail(userEmail).map(User::getId).orElse(null);
+        }
+
+        String json = "{}";
+        int totalNodes = 1;
+        if (request.getRootNode() != null) {
+            try {
+                json = objectMapper.writeValueAsString(request.getRootNode());
+                totalNodes = countNodes(request.getRootNode());
+            } catch (Exception e) {
+                log.error("Failed to serialize root node: {}", e.getMessage());
+            }
+        }
+
+        MindMapRecord record = MindMapRecord.builder()
+                .userId(userId)
+                .title(request.getTitle() != null && !request.getTitle().isBlank() ? request.getTitle() : "Custom Knowledge Graph")
+                .documentNames(request.getDocumentNames() != null ? String.join(", ", request.getDocumentNames()) : "Custom Workspace")
+                .rootNodeJson(json)
+                .totalNodes(totalNodes)
+                .tokensUsed(request.getTokensUsed() != null ? request.getTokensUsed() : 0)
+                .build();
+
+        MindMapRecord saved = mindMapRecordRepository.save(record);
+        log.info("Saved custom MindMap record #{} for user {}", saved.getId(), userEmail);
+        return mapRecordToDto(saved);
+    }
+
+    /**
      * Deletes a saved Mind Map record from PostgreSQL.
      */
     public void deleteMindMap(UUID id) {

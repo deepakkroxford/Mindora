@@ -1,5 +1,7 @@
 package com.substring.docmind.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -11,14 +13,18 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class MindMapResponseDto {
 
     private UUID id;
     private String title;
     private List<String> documentNames;
     private MindMapNodeDto rootNode;
-    private int totalNodes;
-    private int tokensUsed;
-    private boolean isCached;
+    private Integer totalNodes;
+    private Integer tokensUsed;
+
+    @JsonProperty("isCached")
+    private Boolean isCached;
+
     private LocalDateTime createdAt;
 }

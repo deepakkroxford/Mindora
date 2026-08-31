@@ -44,6 +44,43 @@ public class MindMapController {
         );
     }
 
+    @PostMapping("/save")
+    @Operation(summary = "Save a new or cloned mind map to PostgreSQL")
+    public ResponseEntity<ApiResponse<MindMapResponseDto>> saveMindMap(
+            @RequestBody MindMapResponseDto request,
+            Principal principal) {
+        String userEmail = principal != null ? principal.getName() : null;
+        MindMapResponseDto saved = mindMapService.saveMindMap(request, userEmail);
+
+        return ResponseEntity.ok(
+                ApiResponse.<MindMapResponseDto>builder()
+                        .success(true)
+                        .message("Knowledge graph saved to vault")
+                        .data(saved)
+                        .timestamp(LocalDateTime.now())
+                        .build()
+        );
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Update an existing mind map with modified title or edited nodes")
+    public ResponseEntity<ApiResponse<MindMapResponseDto>> updateMindMap(
+            @PathVariable UUID id,
+            @RequestBody MindMapResponseDto request,
+            Principal principal) {
+        String userEmail = principal != null ? principal.getName() : null;
+        MindMapResponseDto updated = mindMapService.updateMindMap(id, request, userEmail);
+
+        return ResponseEntity.ok(
+                ApiResponse.<MindMapResponseDto>builder()
+                        .success(true)
+                        .message("Knowledge graph updated successfully")
+                        .data(updated)
+                        .timestamp(LocalDateTime.now())
+                        .build()
+        );
+    }
+
     @GetMapping("/saved")
     @Operation(summary = "Get user's saved mind maps from PostgreSQL")
     public ResponseEntity<ApiResponse<List<MindMapResponseDto>>> getSavedMindMaps(Principal principal) {

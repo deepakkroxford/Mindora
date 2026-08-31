@@ -1,98 +1,49 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  Panel,
+  useNodesState,
+  useEdgesState,
+  BackgroundVariant,
+} from '@xyflow/react';
+import type { Node, Edge } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import { toPng, toSvg } from 'html-to-image';
+import {
   Brain, Sparkles, RefreshCw, ZoomIn, ZoomOut, Maximize2,
   ChevronRight, ChevronDown, CheckSquare, Square, FileText,
   MessageSquare, Copy, Check, Info, Layers, Tag, ArrowRight,
   Download, Image as ImageIcon, Code, FileDown, Database,
-  Trash2, Clock, Zap, FolderOpen, Calendar
+  Trash2, Clock, Zap, FolderOpen, Calendar, Compass, Move,
+  Network, Sliders, CheckCircle2, Save, Edit3, Plus, X,
+  AlertCircle, PanelLeftOpen, PanelLeftClose
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { mindMapApi } from '../services/api';
 import type { MindMapNodeDto, MindMapResponseDto } from '../types';
+import CustomConceptNode from './graph/CustomConceptNode';
+import type { ConceptNodeData } from './graph/CustomConceptNode';
+import { getLayoutedElements } from '../utils/graphLayout';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 
-// Node positioning layout interface
-interface LayoutNode {
-  data: MindMapNodeDto;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  depth: number;
-  collapsed: boolean;
-  children: LayoutNode[];
-  parent?: LayoutNode;
-}
-
-// Category color configurations
-const CATEGORY_COLORS: Record<string, { bg: string; border: string; text: string; dot: string; glow: string; hex: string }> = {
-  'Architecture': {
-    bg: 'bg-cyan-500/10 dark:bg-cyan-950/40',
-    border: 'border-cyan-500/40',
-    text: 'text-cyan-600 dark:text-cyan-300',
-    dot: 'bg-cyan-400',
-    glow: 'rgba(6, 182, 212, 0.25)',
-    hex: '#06b6d4',
-  },
-  'Security': {
-    bg: 'bg-emerald-500/10 dark:bg-emerald-950/40',
-    border: 'border-emerald-500/40',
-    text: 'text-emerald-600 dark:text-emerald-300',
-    dot: 'bg-emerald-400',
-    glow: 'rgba(16, 185, 129, 0.25)',
-    hex: '#10b981',
-  },
-  'Data Flow': {
-    bg: 'bg-indigo-500/10 dark:bg-indigo-950/40',
-    border: 'border-indigo-500/40',
-    text: 'text-indigo-600 dark:text-indigo-300',
-    dot: 'bg-indigo-400',
-    glow: 'rgba(99, 102, 241, 0.25)',
-    hex: '#6366f1',
-  },
-  'Configuration': {
-    bg: 'bg-amber-500/10 dark:bg-amber-950/40',
-    border: 'border-amber-500/40',
-    text: 'text-amber-600 dark:text-amber-300',
-    dot: 'bg-amber-400',
-    glow: 'rgba(245, 158, 11, 0.25)',
-    hex: '#f59e0b',
-  },
-  'Best Practice': {
-    bg: 'bg-purple-500/10 dark:bg-purple-950/40',
-    border: 'border-purple-500/40',
-    text: 'text-purple-600 dark:text-purple-300',
-    dot: 'bg-purple-400',
-    glow: 'rgba(168, 85, 247, 0.25)',
-    hex: '#a855f7',
-  },
-  'Performance': {
-    bg: 'bg-rose-500/10 dark:bg-rose-950/40',
-    border: 'border-rose-500/40',
-    text: 'text-rose-600 dark:text-rose-300',
-    dot: 'bg-rose-400',
-    glow: 'rgba(244, 63, 94, 0.25)',
-    hex: '#f43f5e',
-  },
-  'Core Concept': {
-    bg: 'bg-teal-500/10 dark:bg-teal-950/40',
-    border: 'border-teal-500/40',
-    text: 'text-teal-600 dark:text-teal-300',
-    dot: 'bg-teal-400',
-    glow: 'rgba(20, 184, 166, 0.25)',
-    hex: '#14b8a6',
-  },
+const nodeTypes = {
+  conceptNode: CustomConceptNode,
 };
 
-const DEFAULT_CATEGORY_COLOR = {
-  bg: 'bg-slate-500/10 dark:bg-slate-800/60',
-  border: 'border-slate-400/40',
-  text: 'text-slate-700 dark:text-slate-300',
-  dot: 'bg-slate-400',
-  glow: 'rgba(148, 163, 184, 0.2)',
-  hex: '#94a3b8',
-};
+const CATEGORIES = [
+  'Architecture',
+  'Security',
+  'Data Flow',
+  'Configuration',
+  'Performance',
+  'Best Practice',
+  'Core Topic',
+  'Concept'
+];
 
 export const MindMapView: React.FC = () => {
   const {
@@ -107,125 +58,76 @@ export const MindMapView: React.FC = () => {
   // Data & Loading state
   const [mindMapData, setMindMapData] = useState<MindMapResponseDto | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isDocSidebarOpen, setIsDocSidebarOpen] = useState(false);
   const [maxDepth, setMaxDepth] = useState<number>(3);
-  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [layoutDirection, setLayoutDirection] = useState<'LR' | 'TB'>('LR');
+  const [edgeType, setEdgeType] = useState<'smoothstep' | 'default' | 'straight'>('smoothstep');
 
   // Saved Database Records State
   const [savedMindMaps, setSavedMindMaps] = useState<MindMapResponseDto[]>([]);
   const [showSavedModal, setShowSavedModal] = useState(false);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
-  // Interaction State
-  const [selectedNode, setSelectedNode] = useState<MindMapNodeDto | null>(null);
+  // Interaction & Node Editing State
+  const [selectedNode, setSelectedNode] = useState<ConceptNodeData | null>(null);
+  const [isEditingNode, setIsEditingNode] = useState(false);
+  const [isAddingChild, setIsAddingChild] = useState(false);
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
 
-  // Canvas Transform State (Pan & Zoom)
-  const [zoom, setZoom] = useState<number>(0.9);
-  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 80, y: 120 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  // Edit Form Fields
+  const [editLabel, setEditLabel] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editKeywords, setEditKeywords] = useState<string[]>([]);
+  const [newKeywordInput, setNewKeywordInput] = useState('');
 
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
+  // Add Child Form Fields
+  const [childLabel, setChildLabel] = useState('');
+  const [childDescription, setChildDescription] = useState('');
+  const [childCategory, setChildCategory] = useState('Concept');
 
-  const isAllSelected = documents.length > 0 && selectedDocumentIds.length === documents.length;
+  // React Flow State
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
-  const handleToggleSelectAll = () => {
-    if (isAllSelected) {
-      clearDocumentSelection();
-    } else {
-      selectAllDocuments();
-    }
-  };
-
-  // Fetch Saved Mind Maps from PostgreSQL
-  const fetchSavedMindMaps = useCallback(async () => {
+  // Fetch Saved Mind Maps from Database
+  const fetchSavedMindMaps = async () => {
     setIsLoadingSaved(true);
     try {
-      const response = await mindMapApi.getSavedMindMaps();
-      if (response.success && response.data) {
-        setSavedMindMaps(response.data);
+      const res = await mindMapApi.getSavedMindMaps();
+      if (res.success && res.data) {
+        setSavedMindMaps(res.data);
       }
-    } catch {
-      // silent
+    } catch (err: any) {
+      console.error('Failed to load saved mind maps:', err);
     } finally {
       setIsLoadingSaved(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     fetchSavedMindMaps();
-  }, [fetchSavedMindMaps]);
+  }, []);
 
-  // Generate Mind Map API Call
-  const handleGenerateMindMap = useCallback(async () => {
-    if (selectedDocumentIds.length === 0) {
-      toast.error('Please select at least 1 document (or check "Select All") to generate a mind map.');
-      return;
+  // When a node is selected, initialize the edit form
+  useEffect(() => {
+    if (selectedNode) {
+      setEditLabel(selectedNode.label || '');
+      setEditDescription(selectedNode.description || '');
+      setEditCategory(selectedNode.category || 'Concept');
+      setEditKeywords(selectedNode.keywords ? [...selectedNode.keywords] : []);
+      setIsEditingNode(false);
+      setIsAddingChild(false);
     }
-
-    setIsLoading(true);
-    try {
-      const response = await mindMapApi.generateMindMap({
-        documentIds: selectedDocumentIds,
-        maxDepth,
-      });
-
-      if (response.success && response.data) {
-        setMindMapData(response.data);
-        setSelectedNode(response.data.rootNode);
-        setCollapsedNodes(new Set());
-        setZoom(0.85);
-        setPan({ x: 80, y: 200 });
-        fetchSavedMindMaps();
-
-        if (response.data.isCached) {
-          toast.success('Loaded cached concept map! ⚡ 0 Tokens');
-        } else {
-          toast.success(`Generated and saved to database! 🧠 (${response.data.tokensUsed || 0} Tokens)`);
-        }
-      } else {
-        toast.error(response.message || 'Failed to generate mind map');
-      }
-    } catch {
-      toast.error('An error occurred while generating mind map.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedDocumentIds, maxDepth, fetchSavedMindMaps]);
-
-  // Load a Saved Mind Map from DB
-  const handleLoadSavedMap = (map: MindMapResponseDto) => {
-    setMindMapData(map);
-    setSelectedNode(map.rootNode);
-    setCollapsedNodes(new Set());
-    setZoom(0.85);
-    setPan({ x: 80, y: 200 });
-    setShowSavedModal(false);
-    toast.success(`Loaded saved mind map: "${map.title}" 💾`);
-  };
-
-  // Delete a Saved Mind Map from DB
-  const handleDeleteSavedMap = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const resp = await mindMapApi.deleteMindMap(id);
-      if (resp.success) {
-        setSavedMindMaps((prev) => prev.filter((m) => m.id !== id));
-        if (mindMapData?.id === id) {
-          setMindMapData(null);
-          setSelectedNode(null);
-        }
-        toast.success('Mind map record deleted from database');
-      }
-    } catch {
-      toast.error('Failed to delete mind map record');
-    }
-  };
+  }, [selectedNode]);
 
   // Toggle Collapse on a Node
-  const toggleCollapse = (nodeId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleCollapse = useCallback((nodeId: string) => {
     setCollapsedNodes((prev) => {
       const next = new Set(prev);
       if (next.has(nodeId)) {
@@ -235,959 +137,1061 @@ export const MindMapView: React.FC = () => {
       }
       return next;
     });
-  };
+  }, []);
 
-  // Pan Canvas Handlers
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-  };
+  // Select Node for Inspector Drawer
+  const handleSelectNode = useCallback((nodeData: ConceptNodeData) => {
+    setSelectedNode(nodeData);
+  }, []);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    setPan({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y,
-    });
-  };
+  // Transform hierarchical MindMap tree to React Flow Elements
+  const rawGraphElements = useMemo(() => {
+    if (!mindMapData?.rootNode) return { nodes: [], edges: [] };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+    const nodesList: Node[] = [];
+    const edgesList: Edge[] = [];
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
-    setZoom((prev) => Math.min(Math.max(prev * zoomFactor, 0.4), 2.2));
-  };
-
-  const handleResetZoom = () => {
-    setZoom(0.85);
-    setPan({ x: 80, y: 200 });
-  };
-
-  // Build recursive layout hierarchy coordinates
-  const layoutTree = useMemo((): LayoutNode | null => {
-    if (!mindMapData || !mindMapData.rootNode) return null;
-
-    const NODE_WIDTH = 230;
-    const NODE_HEIGHT = 90;
-    const HORIZONTAL_GAP = 140;
-    const VERTICAL_GAP = 35;
-
-    let currentY = 0;
-
-    function buildLayout(node: MindMapNodeDto, depth: number): LayoutNode {
+    const traverse = (node: MindMapNodeDto, parentId?: string, isRoot = false) => {
       const isCollapsed = collapsedNodes.has(node.id);
-      const childLayouts: LayoutNode[] = [];
+      const hasChildren = !!(node.children && node.children.length > 0);
 
-      if (!isCollapsed && node.children && node.children.length > 0) {
-        for (const child of node.children) {
-          childLayouts.push(buildLayout(child, depth + 1));
-        }
-      }
+      nodesList.push({
+        id: node.id,
+        type: 'conceptNode',
+        position: { x: 0, y: 0 },
+        data: {
+          id: node.id,
+          label: node.label,
+          description: node.description,
+          category: node.category || (isRoot ? 'Core Topic' : 'Concept'),
+          keywords: node.keywords || [],
+          isRoot,
+          hasChildren,
+          childCount: node.children ? node.children.length : 0,
+          isCollapsed,
+          onToggleCollapse: handleToggleCollapse,
+          onSelectNode: handleSelectNode,
+        },
+      });
 
-      let nodeY: number;
-      if (childLayouts.length === 0) {
-        nodeY = currentY;
-        currentY += NODE_HEIGHT + VERTICAL_GAP;
-      } else {
-        const firstChildY = childLayouts[0].y;
-        const lastChildY = childLayouts[childLayouts.length - 1].y;
-        nodeY = (firstChildY + lastChildY) / 2;
-      }
-
-      const nodeX = depth * (NODE_WIDTH + HORIZONTAL_GAP);
-
-      const layoutNode: LayoutNode = {
-        data: node,
-        x: nodeX,
-        y: nodeY,
-        width: depth === 0 ? 260 : NODE_WIDTH,
-        height: NODE_HEIGHT,
-        depth,
-        collapsed: isCollapsed,
-        children: childLayouts,
-      };
-
-      childLayouts.forEach((c) => (c.parent = layoutNode));
-      return layoutNode;
-    }
-
-    return buildLayout(mindMapData.rootNode, 0);
-  }, [mindMapData, collapsedNodes]);
-
-  // Flatten nodes and connections for rendering
-  const { allNodes, allLinks } = useMemo(() => {
-    if (!layoutTree) return { allNodes: [], allLinks: [] };
-
-    const nodes: LayoutNode[] = [];
-    const links: { id: string; from: { x: number; y: number }; to: { x: number; y: number }; category: string }[] = [];
-
-    function traverse(node: LayoutNode) {
-      nodes.push(node);
-      for (const child of node.children) {
-        links.push({
-          id: `${node.data.id}->${child.data.id}`,
-          from: { x: node.x + node.width, y: node.y + node.height / 2 },
-          to: { x: child.x, y: child.y + child.height / 2 },
-          category: child.data.category || 'Core Concept',
+      if (parentId) {
+        edgesList.push({
+          id: `e-${parentId}-${node.id}`,
+          source: parentId,
+          target: node.id,
+          type: edgeType,
+          animated: true,
+          style: { stroke: isRoot ? '#14b8a6' : '#06b6d4', strokeWidth: 2 },
         });
-        traverse(child);
       }
-    }
 
-    traverse(layoutTree);
-    return { allNodes: nodes, allLinks: links };
-  }, [layoutTree]);
-
-  // Helper to generate standalone SVG markup for export
-  const generateExportSvgString = useCallback(() => {
-    if (!layoutTree || allNodes.length === 0) return null;
-
-    const minX = Math.min(...allNodes.map((n) => n.x)) - 80;
-    const minY = Math.min(...allNodes.map((n) => n.y)) - 80;
-    const maxX = Math.max(...allNodes.map((n) => n.x + n.width)) + 80;
-    const maxY = Math.max(...allNodes.map((n) => n.y + n.height)) + 80;
-
-    const width = Math.max(maxX - minX, 800);
-    const height = Math.max(maxY - minY, 500);
-
-    let pathsSvg = '';
-    allLinks.forEach((link) => {
-      const fromX = link.from.x - minX;
-      const fromY = link.from.y - minY;
-      const toX = link.to.x - minX;
-      const toY = link.to.y - minY;
-      const deltaX = toX - fromX;
-      const curvature = deltaX * 0.5;
-      const d = `M ${fromX} ${fromY} C ${fromX + curvature} ${fromY}, ${toX - curvature} ${toY}, ${toX} ${toY}`;
-      pathsSvg += `<path d="${d}" fill="none" stroke="#14b8a6" stroke-width="2.5" stroke-opacity="0.8" />`;
-    });
-
-    let nodesSvg = '';
-    allNodes.forEach((node) => {
-      const nx = node.x - minX;
-      const ny = node.y - minY;
-      const isRoot = node.depth === 0;
-      const color = CATEGORY_COLORS[node.data.category] || DEFAULT_CATEGORY_COLOR;
-
-      const fill = isRoot ? 'url(#rootGrad)' : '#0f172a';
-      const stroke = isRoot ? '#2dd4bf' : color.hex;
-      const categoryText = (node.data.category || 'Concept').toUpperCase();
-      const labelText = node.data.label.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-      nodesSvg += `
-        <g transform="translate(${nx}, ${ny})">
-          <rect width="${node.width}" height="${node.height}" rx="16" fill="${fill}" stroke="${stroke}" stroke-width="1.5" />
-          ${
-            !isRoot
-              ? `<text x="14" y="24" fill="${color.hex}" font-size="9" font-weight="700" font-family="system-ui, sans-serif">${categoryText}</text>`
-              : ''
-          }
-          <text x="14" y="${isRoot ? 48 : 50}" fill="#ffffff" font-size="${isRoot ? 14 : 12}" font-weight="700" font-family="system-ui, sans-serif">
-            ${labelText.length > 28 ? labelText.substring(0, 26) + '...' : labelText}
-          </text>
-        </g>
-      `;
-    });
-
-    return `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
-        <defs>
-          <linearGradient id="rootGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#0d9488" />
-            <stop offset="100%" stop-color="#0891b2" />
-          </linearGradient>
-        </defs>
-        <rect width="${width}" height="${height}" fill="#080d1a" />
-        ${pathsSvg}
-        ${nodesSvg}
-      </svg>
-    `.trim();
-  }, [layoutTree, allNodes, allLinks]);
-
-  // Download Handlers
-  const handleDownloadSvg = () => {
-    const svgStr = generateExportSvgString();
-    if (!svgStr) return;
-    const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const title = mindMapData?.title?.replace(/[^a-zA-Z0-9_-]/g, '_') || 'Concept_MindMap';
-    a.href = url;
-    a.download = `${title}.svg`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setShowDownloadMenu(false);
-    toast.success('Downloaded Mind Map as SVG! 📐');
-  };
-
-  const handleDownloadPng = () => {
-    const svgStr = generateExportSvgString();
-    if (!svgStr) return;
-
-    const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-
-    img.onload = () => {
-      const scale = 2; // 2x Retina Resolution
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width * scale;
-      canvas.height = img.height * scale;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.scale(scale, scale);
-        ctx.drawImage(img, 0, 0);
-        const pngUrl = canvas.toDataURL('image/png');
-        const a = document.createElement('a');
-        const title = mindMapData?.title?.replace(/[^a-zA-Z0-9_-]/g, '_') || 'Concept_MindMap';
-        a.href = pngUrl;
-        a.download = `${title}.png`;
-        a.click();
-        toast.success('Downloaded Mind Map as High-Res PNG! 🖼️');
+      if (hasChildren && !isCollapsed) {
+        node.children!.forEach((child) => traverse(child, node.id, false));
       }
-      URL.revokeObjectURL(url);
-      setShowDownloadMenu(false);
     };
 
-    img.src = url;
-  };
+    traverse(mindMapData.rootNode, undefined, true);
+    return { nodes: nodesList, edges: edgesList };
+  }, [mindMapData, collapsedNodes, edgeType, handleToggleCollapse, handleSelectNode]);
 
-  const handleDownloadMarkdown = () => {
-    if (!mindMapData || !mindMapData.rootNode) return;
+  // Apply Dagre Auto-Layout
+  useEffect(() => {
+    if (rawGraphElements.nodes.length === 0) {
+      setNodes([]);
+      setEdges([]);
+      return;
+    }
+    const layouted = getLayoutedElements(
+      rawGraphElements.nodes,
+      rawGraphElements.edges,
+      layoutDirection
+    );
+    setNodes(layouted.nodes);
+    setEdges(layouted.edges);
+  }, [rawGraphElements, layoutDirection, setNodes, setEdges]);
 
-    function buildMarkdown(node: MindMapNodeDto, indent: number): string {
-      const space = '  '.repeat(indent);
-      let res = `${space}- **${node.label}** (${node.category || 'Concept'}): ${node.description}\n`;
-      if (node.keywords && node.keywords.length > 0) {
-        res += `${space}  *Keywords*: ${node.keywords.join(', ')}\n`;
-      }
-      if (node.children) {
-        for (const c of node.children) {
-          res += buildMarkdown(c, indent + 1);
-        }
-      }
-      return res;
+  // Generate Mind Map Handler
+  const handleGenerateMindMap = async () => {
+    if (selectedDocumentIds.length === 0) {
+      toast.error('Please select at least one document to generate a Knowledge Graph.');
+      return;
     }
 
-    const md = `# ${mindMapData.title}\n\n*Generated by Mindora RAG Concept Engine*\n\n` + buildMarkdown(mindMapData.rootNode, 0);
+    setIsLoading(true);
+    try {
+      const res = await mindMapApi.generateMindMap({
+        documentIds: selectedDocumentIds,
+        maxDepth,
+      });
+
+      if (res.success && res.data) {
+        setMindMapData(res.data);
+        setCollapsedNodes(new Set());
+        setSelectedNode(null);
+        setHasUnsavedChanges(false);
+        if (res.data.isCached) {
+          toast.success('Retrieved instant Knowledge Graph (Redis Cache Hit)!');
+        } else {
+          toast.success(`Generated interactive Knowledge Graph with ${res.data.totalNodes} concept nodes!`);
+        }
+        fetchSavedMindMaps();
+      } else {
+        toast.error(res.message || 'Failed to generate Knowledge Graph.');
+      }
+    } catch (err: any) {
+      console.error('Error generating mind map:', err);
+      toast.error(err.response?.data?.message || 'Error generating Knowledge Graph.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Save or Update Knowledge Graph in PostgreSQL Vault
+  const handleSaveToVault = async () => {
+    if (!mindMapData || !mindMapData.rootNode) {
+      toast.error('No knowledge graph to save.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      let res;
+      if (mindMapData.id) {
+        // Update existing record
+        res = await mindMapApi.updateMindMap(mindMapData.id, mindMapData);
+      } else {
+        // Save as new record
+        res = await mindMapApi.saveMindMap(mindMapData);
+      }
+
+      if (res.success && res.data) {
+        setMindMapData(res.data);
+        setHasUnsavedChanges(false);
+        toast.success(`Knowledge Graph saved to Vault!`);
+        fetchSavedMindMaps();
+      } else {
+        toast.error(res.message || 'Failed to save to vault.');
+      }
+    } catch (err: any) {
+      console.error('Save to vault error:', err);
+      toast.error('Failed to save Knowledge Graph to vault.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Helper: Recursively update node in tree
+  const updateNodeInTree = (
+    root: MindMapNodeDto,
+    targetId: string,
+    updated: Partial<MindMapNodeDto>
+  ): MindMapNodeDto => {
+    if (root.id === targetId) {
+      return { ...root, ...updated };
+    }
+    if (!root.children || root.children.length === 0) {
+      return root;
+    }
+    return {
+      ...root,
+      children: root.children.map((c) => updateNodeInTree(c, targetId, updated)),
+    };
+  };
+
+  // Helper: Recursively add child node
+  const addChildInTree = (
+    root: MindMapNodeDto,
+    parentId: string,
+    newChild: MindMapNodeDto
+  ): MindMapNodeDto => {
+    if (root.id === parentId) {
+      const existing = root.children || [];
+      return {
+        ...root,
+        children: [...existing, newChild],
+      };
+    }
+    if (!root.children || root.children.length === 0) {
+      return root;
+    }
+    return {
+      ...root,
+      children: root.children.map((c) => addChildInTree(c, parentId, newChild)),
+    };
+  };
+
+  // Helper: Recursively delete node
+  const deleteNodeInTree = (
+    root: MindMapNodeDto,
+    targetId: string
+  ): MindMapNodeDto | null => {
+    if (root.id === targetId) return null;
+    if (!root.children || root.children.length === 0) return root;
+
+    const filtered = root.children
+      .map((c) => deleteNodeInTree(c, targetId))
+      .filter((c): c is MindMapNodeDto => c !== null);
+
+    return {
+      ...root,
+      children: filtered,
+    };
+  };
+
+  // Helper: Count total nodes
+  const countTotalNodes = (root: MindMapNodeDto): number => {
+    let count = 1;
+    if (root.children) {
+      root.children.forEach((c) => {
+        count += countTotalNodes(c);
+      });
+    }
+    return count;
+  };
+
+  // Apply Node Edits to Graph
+  const handleApplyNodeEdit = () => {
+    if (!mindMapData?.rootNode || !selectedNode) return;
+
+    const updatedRoot = updateNodeInTree(mindMapData.rootNode, selectedNode.id, {
+      label: editLabel.trim() || selectedNode.label,
+      description: editDescription.trim(),
+      category: editCategory,
+      keywords: editKeywords,
+    });
+
+    const updatedData: MindMapResponseDto = {
+      ...mindMapData,
+      rootNode: updatedRoot,
+      totalNodes: countTotalNodes(updatedRoot),
+    };
+
+    setMindMapData(updatedData);
+    setHasUnsavedChanges(true);
+    setIsEditingNode(false);
+
+    // Update selectedNode state
+    setSelectedNode({
+      ...selectedNode,
+      label: editLabel.trim() || selectedNode.label,
+      description: editDescription.trim(),
+      category: editCategory,
+      keywords: editKeywords,
+    });
+
+    toast.success('Concept updated on canvas. Click "Save to Vault" to persist changes.');
+  };
+
+  // Add Child Node to Selected Concept
+  const handleAddChildToSelected = () => {
+    if (!mindMapData?.rootNode || !selectedNode || !childLabel.trim()) return;
+
+    const newChildNode: MindMapNodeDto = {
+      id: `custom-node-${Date.now()}`,
+      label: childLabel.trim(),
+      description: childDescription.trim() || 'Custom added concept note.',
+      category: childCategory,
+      keywords: [],
+      children: [],
+    };
+
+    const updatedRoot = addChildInTree(mindMapData.rootNode, selectedNode.id, newChildNode);
+
+    const updatedData: MindMapResponseDto = {
+      ...mindMapData,
+      rootNode: updatedRoot,
+      totalNodes: countTotalNodes(updatedRoot),
+    };
+
+    setMindMapData(updatedData);
+    setHasUnsavedChanges(true);
+    setIsAddingChild(false);
+    setChildLabel('');
+    setChildDescription('');
+
+    // Ensure branch is expanded to see new child
+    setCollapsedNodes((prev) => {
+      const next = new Set(prev);
+      next.delete(selectedNode.id);
+      return next;
+    });
+
+    toast.success(`Added sub-concept "${newChildNode.label}" to graph!`);
+  };
+
+  // Delete Selected Node Branch
+  const handleDeleteSelectedNode = () => {
+    if (!mindMapData?.rootNode || !selectedNode) return;
+    if (selectedNode.isRoot) {
+      toast.error('Cannot delete root core topic node.');
+      return;
+    }
+
+    const updatedRoot = deleteNodeInTree(mindMapData.rootNode, selectedNode.id);
+    if (!updatedRoot) return;
+
+    const updatedData: MindMapResponseDto = {
+      ...mindMapData,
+      rootNode: updatedRoot,
+      totalNodes: countTotalNodes(updatedRoot),
+    };
+
+    setMindMapData(updatedData);
+    setSelectedNode(null);
+    setHasUnsavedChanges(true);
+    toast.success('Concept node removed from graph.');
+  };
+
+  // Delete Saved Mind Map Record
+  const handleDeleteMindMap = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const res = await mindMapApi.deleteMindMap(id);
+      if (res.success) {
+        toast.success('Knowledge Graph removed from vault.');
+        setSavedMindMaps((prev) => prev.filter((m) => m.id !== id));
+        if (mindMapData?.id === id) {
+          setMindMapData(null);
+          setSelectedNode(null);
+          setHasUnsavedChanges(false);
+        }
+      }
+    } catch (err: any) {
+      toast.error('Failed to delete Knowledge Graph.');
+    }
+  };
+
+  // Export Canvas as High-Res PNG
+  const handleExportPng = async () => {
+    if (!reactFlowWrapper.current) return;
+    setShowExportMenu(false);
+    try {
+      const dataUrl = await toPng(reactFlowWrapper.current, {
+        backgroundColor: '#070b14',
+        quality: 1,
+        pixelRatio: 2,
+      });
+      const link = document.createElement('a');
+      link.download = `${mindMapData?.title || 'mindora_knowledge_graph'}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success('Exported high-resolution Knowledge Graph PNG');
+    } catch (err) {
+      console.error('Export PNG failed:', err);
+      toast.error('Failed to export PNG');
+    }
+  };
+
+  // Export Markdown Taxonomy
+  const handleExportMarkdown = () => {
+    if (!mindMapData?.rootNode) return;
+    setShowExportMenu(false);
+
+    let md = `# 🧠 ${mindMapData.title || 'Mindora Knowledge Graph'}\n\n`;
+    md += `* **Documents**: ${mindMapData.documentNames?.join(', ') || 'All Library'}\n`;
+    md += `* **Total Nodes**: ${mindMapData.totalNodes}\n`;
+    md += `* **Generated At**: ${new Date(mindMapData.createdAt).toLocaleString()}\n\n---\n\n`;
+
+    const traverse = (node: MindMapNodeDto, depth = 0) => {
+      const indent = '  '.repeat(depth);
+      md += `${indent}- **${node.label}** (${node.category || 'Concept'})\n`;
+      if (node.description) {
+        md += `${indent}  > ${node.description}\n`;
+      }
+      if (node.keywords && node.keywords.length > 0) {
+        md += `${indent}  *Tags*: \`#${node.keywords.join('` `#')}\`\n`;
+      }
+      if (node.children) {
+        node.children.forEach((child) => traverse(child, depth + 1));
+      }
+    };
+
+    traverse(mindMapData.rootNode, 0);
+
     const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const title = mindMapData?.title?.replace(/[^a-zA-Z0-9_-]/g, '_') || 'Concept_MindMap';
-    a.href = url;
-    a.download = `${title}_Outline.md`;
-    a.click();
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${mindMapData.title || 'knowledge_graph'}_taxonomy.md`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
     URL.revokeObjectURL(url);
-    setShowDownloadMenu(false);
-    toast.success('Downloaded Markdown Outline (.md)! 📄');
+    toast.success('Exported Markdown taxonomy outline');
   };
 
-  const handleCopyOutline = () => {
-    if (!mindMapData || !mindMapData.rootNode) return;
-
-    function buildMarkdown(node: MindMapNodeDto, indent: number): string {
-      const space = '  '.repeat(indent);
-      let res = `${space}- **${node.label}** (${node.category || 'Concept'}): ${node.description}\n`;
-      if (node.children) {
-        for (const c of node.children) {
-          res += buildMarkdown(c, indent + 1);
-        }
-      }
-      return res;
-    }
-
-    const md = `# ${mindMapData.title}\n\n` + buildMarkdown(mindMapData.rootNode, 0);
-    navigator.clipboard.writeText(md);
-    setShowDownloadMenu(false);
-    toast.success('Concept outline copied to clipboard! 📋');
+  // Launch 1-Click AI Query in Chat
+  const handleAskAiAboutConcept = (conceptLabel: string) => {
+    const prompt = `Can you explain "${conceptLabel}" in detail based on the indexed documents, its core architecture, and how it connects to surrounding systems?`;
+    navigator.clipboard.writeText(prompt);
+    setCopiedPrompt(true);
+    setTimeout(() => setCopiedPrompt(false), 2000);
+    toast.success('Prompt copied! Switching to Chat Assistant...');
+    setActiveTab('chat');
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-[#080d1a] text-slate-900 dark:text-slate-100">
+    <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-[#070b14] overflow-hidden">
       
-      {/* ── 1. Top Control & Scoping Bar ── */}
-      <div className="px-6 py-4 bg-white/90 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex-shrink-0 z-10 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-teal-500 to-cyan-500 flex items-center justify-center text-white shadow-md shadow-teal-500/20 flex-shrink-0">
-              <Brain className="w-5 h-5" />
+      {/* ── Top Header & Config Glassmorphic Toolbar ── */}
+      <div className="border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-[#0d1424]/90 backdrop-blur-xl px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 z-20">
+        
+        {/* Title & Stats */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-teal-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-500/20 text-white flex-shrink-0">
+            <Network className="w-5 h-5 animate-pulse" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white tracking-tight">
+                Interactive Knowledge Graph
+              </h1>
+              {hasUnsavedChanges && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 text-[10px] font-bold uppercase tracking-wider font-mono animate-pulse">
+                  Unsaved Edits
+                </span>
+              )}
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Concept Mind Map & Hierarchy
-                </h1>
-                {mindMapData && (
-                  <>
-                    <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-600 dark:text-teal-300">
-                      {mindMapData.totalNodes} Nodes Synthesized
-                    </span>
-                    {/* Token Consumption Badge */}
-                    <span className={clsx(
-                      "text-[10px] font-bold font-mono px-2.5 py-0.5 rounded-full border inline-flex items-center gap-1",
-                      mindMapData.tokensUsed && mindMapData.tokensUsed > 0
-                        ? "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
-                        : "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-                    )}>
-                      <Zap className="w-3 h-3" />
-                      <span>{mindMapData.tokensUsed && mindMapData.tokensUsed > 0 ? `${mindMapData.tokensUsed.toLocaleString()} Tokens Used` : '0 Tokens (Cached / DB)'}</span>
-                    </span>
-                  </>
-                )}
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Explore structural relationships, sub-mechanisms, and core entities extracted from document vectors.
-              </p>
-            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-md">
+              {mindMapData ? `${mindMapData.title} • ${mindMapData.totalNodes} Nodes` : 'Select documents and generate a concept network.'}
+            </p>
+          </div>
+        </div>
+
+        {/* Toolbar Controls */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          
+          {/* Scope Documents Collapsible Toggle */}
+          <button
+            onClick={() => setIsDocSidebarOpen(!isDocSidebarOpen)}
+            className={clsx(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shadow-sm',
+              isDocSidebarOpen
+                ? 'bg-teal-500/20 text-teal-300 border-teal-500/40 shadow-teal-500/10'
+                : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+            )}
+            title="Toggle Scope Documents Sidebar"
+          >
+            {isDocSidebarOpen ? <PanelLeftClose className="w-3.5 h-3.5 text-teal-400" /> : <PanelLeftOpen className="w-3.5 h-3.5 text-teal-400" />}
+            <span>Scope ({selectedDocumentIds.length})</span>
+          </button>
+
+          {/* Saved Maps Vault Button */}
+          <button
+            onClick={() => setShowSavedModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all shadow-sm"
+          >
+            <FolderOpen className="w-3.5 h-3.5 text-teal-400" />
+            <span>Vault ({savedMindMaps.length})</span>
+          </button>
+
+          {/* 💾 Save to Vault Button */}
+          {mindMapData && (
+            <button
+              onClick={handleSaveToVault}
+              disabled={isSaving}
+              className={clsx(
+                'flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm active:scale-95',
+                hasUnsavedChanges
+                  ? 'bg-gradient-to-r from-amber-600 to-amber-500 text-white border-amber-400/50 shadow-amber-500/20 animate-pulse'
+                  : 'bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border-teal-500/30'
+              )}
+              title="Save current knowledge graph to PostgreSQL Vault"
+            >
+              <Save className={clsx('w-3.5 h-3.5', isSaving && 'animate-spin')} />
+              <span>{isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save Changes' : 'Saved to Vault'}</span>
+            </button>
+          )}
+
+          {/* Layout Switcher (LR vs TB) */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 rounded-xl p-1 border border-slate-200 dark:border-slate-700 text-xs">
+            <button
+              onClick={() => setLayoutDirection('LR')}
+              className={clsx(
+                'px-2.5 py-1 rounded-lg font-medium transition-all text-xs flex items-center gap-1',
+                layoutDirection === 'LR'
+                  ? 'bg-teal-600 text-white font-semibold shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              )}
+              title="Horizontal Tree Layout (Left to Right)"
+            >
+              <ArrowRight className="w-3 h-3" />
+              <span>Horizontal</span>
+            </button>
+            <button
+              onClick={() => setLayoutDirection('TB')}
+              className={clsx(
+                'px-2.5 py-1 rounded-lg font-medium transition-all text-xs flex items-center gap-1',
+                layoutDirection === 'TB'
+                  ? 'bg-teal-600 text-white font-semibold shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              )}
+              title="Vertical Tree Layout (Top to Bottom)"
+            >
+              <ChevronDown className="w-3 h-3" />
+              <span>Vertical</span>
+            </button>
           </div>
 
-          {/* Action Toolbar */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Saved Mind Maps Button */}
-            <button
-              onClick={() => {
-                fetchSavedMindMaps();
-                setShowSavedModal(true);
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-800/80 text-xs font-semibold text-purple-700 dark:text-purple-300 transition-colors shadow-sm"
-              title="View Persistent Mind Maps in PostgreSQL"
+          {/* Depth Selector */}
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 px-3 py-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+            <Layers className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-slate-500 dark:text-slate-400 font-medium">Depth:</span>
+            <select
+              value={maxDepth}
+              onChange={(e) => setMaxDepth(Number(e.target.value))}
+              className="bg-transparent font-bold text-teal-600 dark:text-teal-400 outline-none cursor-pointer"
             >
-              <Database className="w-3.5 h-3.5" />
-              <span>Saved Records ({savedMindMaps.length})</span>
-            </button>
+              <option value={2} className="bg-slate-900 text-white">2 (Macro)</option>
+              <option value={3} className="bg-slate-900 text-white">3 (Standard)</option>
+              <option value={4} className="bg-slate-900 text-white">4 (Deep Graph)</option>
+            </select>
+          </div>
 
-            {/* Depth selector */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-950 rounded-xl p-0.5 border border-slate-200 dark:border-slate-800">
-              {[2, 3, 4].map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setMaxDepth(d)}
-                  className={clsx(
-                    'px-2.5 py-1 rounded-lg text-xs font-semibold transition-all',
-                    maxDepth === d
-                      ? 'bg-teal-600 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  )}
-                >
-                  {d} Levels
-                </button>
-              ))}
-            </div>
+          {/* Generate Button */}
+          <button
+            onClick={handleGenerateMindMap}
+            disabled={isLoading || selectedDocumentIds.length === 0}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 via-cyan-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-teal-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+          >
+            <Sparkles className={clsx('w-4 h-4', isLoading && 'animate-spin')} />
+            <span>{isLoading ? 'Synthesizing...' : 'Generate Graph'}</span>
+          </button>
 
-            <button
-              onClick={handleGenerateMindMap}
-              disabled={isLoading || selectedDocumentIds.length === 0}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 !text-white text-xs font-bold shadow-md shadow-teal-600/20 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <RefreshCw className={clsx('w-3.5 h-3.5', isLoading && 'animate-spin')} />
-              <span>{isLoading ? 'Synthesizing Graph...' : selectedDocumentIds.length === 0 ? 'Pick Documents' : 'Generate Mind Map'}</span>
-            </button>
+          {/* Export Dropdown */}
+          {mindMapData && (
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="p-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 transition-all shadow-sm"
+                title="Export Knowledge Graph"
+              >
+                <Download className="w-4 h-4 text-teal-400" />
+              </button>
 
-            {/* Download Dropdown */}
-            {mindMapData && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowDownloadMenu(!showDownloadMenu)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors shadow-sm"
-                  title="Download Mind Map Options"
-                >
-                  <Download className="w-3.5 h-3.5 text-teal-500" />
-                  <span>Download Graph</span>
-                  <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
-                </button>
-
-                {showDownloadMenu && (
-                  <div className="absolute right-0 top-full mt-1.5 w-56 bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl py-2 z-40 animate-fade-in glass-panel">
-                    <div className="px-3.5 pb-1.5 mb-1 border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      Export Format
-                    </div>
-
+              {showExportMenu && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setShowExportMenu(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-[#0f172a]/95 border border-slate-700/80 shadow-2xl backdrop-blur-xl p-2 z-30 space-y-1 animate-fade-in text-xs">
                     <button
-                      onClick={handleDownloadPng}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left font-medium"
+                      onClick={handleExportPng}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-slate-200 hover:bg-slate-800 transition-colors"
                     >
-                      <ImageIcon className="w-4 h-4 text-cyan-500" />
+                      <ImageIcon className="w-4 h-4 text-teal-400" />
                       <div>
-                        <div className="font-semibold">PNG Image (.png)</div>
-                        <div className="text-[10px] text-slate-500">High-resolution Retina visual</div>
+                        <div className="font-semibold text-white">Export High-Res PNG</div>
+                        <div className="text-[10px] text-slate-400">Full 2x canvas snapshot</div>
                       </div>
                     </button>
-
                     <button
-                      onClick={handleDownloadSvg}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left font-medium"
+                      onClick={handleExportMarkdown}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-slate-200 hover:bg-slate-800 transition-colors"
                     >
-                      <Code className="w-4 h-4 text-teal-500" />
+                      <Code className="w-4 h-4 text-cyan-400" />
                       <div>
-                        <div className="font-semibold">Scalable Vector (.svg)</div>
-                        <div className="text-[10px] text-slate-500">Lossless vector graphics</div>
+                        <div className="font-semibold text-white">Export Markdown Outline</div>
+                        <div className="text-[10px] text-slate-400">Hierarchical taxonomy tree</div>
                       </div>
-                    </button>
-
-                    <button
-                      onClick={handleDownloadMarkdown}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left font-medium"
-                    >
-                      <FileDown className="w-4 h-4 text-indigo-500" />
-                      <div>
-                        <div className="font-semibold">Markdown File (.md)</div>
-                        <div className="text-[10px] text-slate-500">Structured concept breakdown</div>
-                      </div>
-                    </button>
-
-                    <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
-
-                    <button
-                      onClick={handleCopyOutline}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left font-medium"
-                    >
-                      <Copy className="w-4 h-4 text-purple-500" />
-                      <span>Copy Outline to Clipboard</span>
                     </button>
                   </div>
-                )}
+                </>
+              )}
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {/* ── Main Canvas & Sidebar Container ── */}
+      <div className="flex-1 flex overflow-hidden relative">
+        
+        {/* Document Selection Collapsible Drawer Panel */}
+        {isDocSidebarOpen && (
+          <div className="w-72 border-r border-slate-200 dark:border-slate-800/80 bg-white/95 dark:bg-[#0a0f1d]/95 backdrop-blur-xl p-4 flex flex-col justify-between z-10 animate-fade-in shadow-2xl">
+            <div className="space-y-4 overflow-y-auto custom-scrollbar flex-1 pr-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Scope Docs ({selectedDocumentIds.length})</span>
+                </span>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <button
+                    onClick={selectAllDocuments}
+                    className="text-teal-600 dark:text-teal-400 hover:underline font-semibold"
+                  >
+                    All
+                  </button>
+                  <span className="text-slate-400">•</span>
+                  <button
+                    onClick={clearDocumentSelection}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    onClick={() => setIsDocSidebarOpen(false)}
+                    className="p-1 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white ml-1"
+                    title="Minimize Scope Panel"
+                  >
+                    <PanelLeftClose className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Document Checkbox List */}
+              <div className="space-y-1.5">
+                {documents.map((doc) => {
+                  const isSelected = selectedDocumentIds.includes(doc.id);
+                  return (
+                    <div
+                      key={doc.id}
+                      onClick={() => toggleDocumentSelection(doc.id)}
+                      className={clsx(
+                        'p-2.5 rounded-xl border transition-all cursor-pointer flex items-center gap-2.5 text-xs',
+                        isSelected
+                          ? 'bg-teal-500/10 border-teal-500/40 text-slate-900 dark:text-white shadow-sm'
+                          : 'bg-white/40 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
+                      )}
+                    >
+                      <div className={clsx('flex-shrink-0', isSelected ? 'text-teal-500' : 'text-slate-400')}>
+                        {isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                      </div>
+                      <span className="truncate font-medium flex-1" title={doc.filename}>
+                        {doc.filename}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Quick Stats in Drawer */}
+            {mindMapData && (
+              <div className="p-3.5 rounded-2xl bg-teal-950/20 border border-teal-500/30 space-y-2 mt-4 text-[11px]">
+                <div className="flex items-center justify-between text-teal-400 font-bold">
+                  <span>Network Statistics</span>
+                  <Sparkles className="w-3.5 h-3.5" />
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-slate-300 font-mono">
+                  <div>Nodes: <span className="text-white font-bold">{mindMapData.totalNodes}</span></div>
+                  <div>Tokens: <span className="text-white font-bold">{mindMapData.tokensUsed}</span></div>
+                </div>
               </div>
             )}
           </div>
-        </div>
-
-        {/* Document Filter Strip */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs">
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Master Select All Checkbox */}
-            <button
-              type="button"
-              onClick={handleToggleSelectAll}
-              className={clsx(
-                'inline-flex items-center gap-2 px-3 py-1 rounded-xl text-xs font-semibold border transition-all',
-                isAllSelected
-                  ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100'
-              )}
-            >
-              {isAllSelected ? (
-                <CheckSquare className="w-3.5 h-3.5 text-white" />
-              ) : (
-                <Square className="w-3.5 h-3.5 text-slate-400" />
-              )}
-              <span>Select All Documents ({documents.length})</span>
-            </button>
-
-            {/* Individual Documents */}
-            {documents.map((doc) => {
-              const isSelected = selectedDocumentIds.includes(doc.id);
-              return (
-                <button
-                  key={doc.id}
-                  type="button"
-                  onClick={() => toggleDocumentSelection(doc.id)}
-                  className={clsx(
-                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium border transition-all cursor-pointer',
-                    isSelected
-                      ? 'bg-teal-500/15 border-teal-500/50 text-teal-700 dark:text-teal-300 shadow-sm ring-1 ring-teal-500/30'
-                      : 'bg-white dark:bg-slate-950/60 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
-                  )}
-                >
-                  {isSelected ? (
-                    <CheckSquare className="w-3 h-3 text-teal-600 dark:text-teal-400 flex-shrink-0" />
-                  ) : (
-                    <Square className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                  )}
-                  <FileText className="w-3 h-3 opacity-70 flex-shrink-0" />
-                  <span className="max-w-[130px] truncate">{doc.filename}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* ── 2. Interactive SVG Canvas & Concept Inspector ── */}
-      <div className="flex-1 relative overflow-hidden flex">
-        
-        {/* Main Canvas Area */}
-        <div
-          ref={canvasRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onWheel={handleWheel}
-          className={clsx(
-            'flex-1 h-full w-full relative overflow-hidden select-none',
-            isDragging ? 'cursor-grabbing' : 'cursor-grab'
-          )}
-        >
-          {/* Subtle Grid Background */}
-          <div
-            className="absolute inset-0 pointer-events-none opacity-40 dark:opacity-25"
-            style={{
-              backgroundImage: 'radial-gradient(#14b8a6 1px, transparent 1px)',
-              backgroundSize: '24px 24px',
-              backgroundPosition: `${pan.x}px ${pan.y}px`,
-            }}
-          />
-
-          {/* Floating Zoom & Canvas Controls */}
-          <div className="absolute bottom-6 left-6 z-20 flex items-center gap-1.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl">
-            <button
-              onClick={() => setZoom((prev) => Math.min(prev + 0.15, 2.2))}
-              className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
-              title="Zoom In"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <span className="text-xs font-mono font-bold px-2 text-slate-500">
-              {Math.round(zoom * 100)}%
-            </span>
-            <button
-              onClick={() => setZoom((prev) => Math.max(prev - 0.15, 0.4))}
-              className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
-              title="Zoom Out"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <div className="w-[1px] h-5 bg-slate-200 dark:bg-slate-800 mx-1" />
-            <button
-              onClick={handleResetZoom}
-              className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
-              title="Reset & Center View"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Empty Prompt State */}
-          {!isLoading && !mindMapData && selectedDocumentIds.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center p-6 z-10 pointer-events-none">
-              <div className="p-8 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60 backdrop-blur-md text-center max-w-md space-y-4 pointer-events-auto">
-                <div className="w-14 h-14 rounded-2xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center mx-auto text-teal-500">
-                  <Brain className="w-7 h-7" />
-                </div>
-                <div className="space-y-1.5">
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    Select Documents to Map Concepts
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Pick your documents from the bar above to visualize key concepts, hierarchy, and relationships.
-                  </p>
-                </div>
-                <div className="flex items-center justify-center gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={selectAllDocuments}
-                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 !text-white text-xs font-bold shadow-md transition-all inline-flex items-center gap-2"
-                  >
-                    <CheckSquare className="w-4 h-4 !text-white" />
-                    <span>Select All Documents ({documents.length})</span>
-                  </button>
-
-                  {savedMindMaps.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        fetchSavedMindMaps();
-                        setShowSavedModal(true);
-                      }}
-                      className="px-4 py-2 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-bold shadow-sm transition-all inline-flex items-center gap-1.5"
-                    >
-                      <Database className="w-3.5 h-3.5" />
-                      <span>Open Saved Records</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Loading Shimmer */}
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center p-6 z-10 bg-slate-900/20 backdrop-blur-xs">
-              <div className="p-8 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 text-center space-y-4 shadow-2xl animate-pulse">
-                <div className="w-14 h-14 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto text-teal-500">
-                  <Sparkles className="w-7 h-7 animate-spin" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    Synthesizing Hierarchical Mind Map...
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
-                    Extracting core topics, clustering relationships, and saving to database.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* SVG Connection Links & Transformed Graph Canvas */}
-          {layoutTree && (
-            <div
-              className="absolute origin-top-left transition-transform duration-75 ease-out"
-              style={{
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              }}
-            >
-              {/* SVG Connecting Bézier Curves */}
-              <svg
-                ref={svgRef}
-                className="absolute top-0 left-0 overflow-visible pointer-events-none"
-                style={{ width: '4000px', height: '3000px' }}
-              >
-                <defs>
-                  <linearGradient id="linkGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.8" />
-                    <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.8" />
-                  </linearGradient>
-                </defs>
-
-                {allLinks.map((link) => {
-                  const deltaX = link.to.x - link.from.x;
-                  const curvature = deltaX * 0.5;
-                  const path = `M ${link.from.x} ${link.from.y} C ${link.from.x + curvature} ${link.from.y}, ${link.to.x - curvature} ${link.to.y}, ${link.to.x} ${link.to.y}`;
-
-                  return (
-                    <g key={link.id}>
-                      <path
-                        d={path}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        className="text-slate-300 dark:text-slate-700/80 transition-all"
-                      />
-                      <path
-                        d={path}
-                        fill="none"
-                        stroke="url(#linkGradient)"
-                        strokeWidth="2"
-                        strokeDasharray="6 4"
-                        className="animate-pulse"
-                      />
-                    </g>
-                  );
-                })}
-              </svg>
-
-              {/* Render Nodes */}
-              {allNodes.map((node) => {
-                const isRoot = node.depth === 0;
-                const isSelected = selectedNode?.id === node.data.id;
-                const hasChildren = node.data.children && node.data.children.length > 0;
-                const isCollapsed = collapsedNodes.has(node.data.id);
-                const colorConfig = CATEGORY_COLORS[node.data.category] || DEFAULT_CATEGORY_COLOR;
-
-                return (
-                  <div
-                    key={node.data.id}
-                    onClick={() => setSelectedNode(node.data)}
-                    className={clsx(
-                      'absolute rounded-2xl border transition-all duration-200 cursor-pointer shadow-lg select-none group',
-                      isRoot
-                        ? 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white border-teal-400 shadow-teal-500/20'
-                        : clsx(
-                            'bg-white dark:bg-slate-900/90',
-                            colorConfig.border,
-                            isSelected
-                              ? 'ring-2 ring-teal-500 shadow-xl scale-[1.02]'
-                              : 'hover:scale-[1.02] hover:shadow-xl'
-                          )
-                    )}
-                    style={{
-                      left: `${node.x}px`,
-                      top: `${node.y}px`,
-                      width: `${node.width}px`,
-                      minHeight: `${node.height}px`,
-                    }}
-                  >
-                    <div className="p-3.5 space-y-1.5 relative">
-                      {/* Node Header Row */}
-                      <div className="flex items-center justify-between gap-2">
-                        {!isRoot && (
-                          <span
-                            className={clsx(
-                              'text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border',
-                              colorConfig.bg,
-                              colorConfig.text,
-                              colorConfig.border
-                            )}
-                          >
-                            {node.data.category || 'Concept'}
-                          </span>
-                        )}
-
-                        {/* Collapse / Expand Badge */}
-                        {hasChildren && (
-                          <button
-                            onClick={(e) => toggleCollapse(node.data.id, e)}
-                            className={clsx(
-                              'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors ml-auto',
-                              isRoot
-                                ? 'bg-white/20 hover:bg-white/30 text-white border-white/40'
-                                : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                            )}
-                            title={isCollapsed ? 'Expand branch' : 'Collapse branch'}
-                          >
-                            {isCollapsed ? '+' : '−'}
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Node Title */}
-                      <h4
-                        className={clsx(
-                          'text-xs font-bold leading-snug line-clamp-2',
-                          isRoot ? 'text-white text-sm' : 'text-slate-900 dark:text-slate-100'
-                        )}
-                      >
-                        {node.data.label}
-                      </h4>
-
-                      {/* Child count preview pill */}
-                      {hasChildren && isCollapsed && (
-                        <div className="pt-1">
-                          <span className="text-[10px] font-mono text-teal-500 font-bold">
-                            +{node.data.children?.length} sub-branches hidden
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* ── 3. Concept Deep-Dive Side Inspector Sheet ── */}
-        {selectedNode && (
-          <div className="w-80 sm:w-96 bg-white/95 dark:bg-[#0d1526]/95 backdrop-blur-xl border-l border-slate-200 dark:border-slate-800 p-6 flex flex-col justify-between shadow-2xl z-30 animate-fade-in custom-scrollbar overflow-y-auto">
-            <div className="space-y-6">
-              {/* Drawer Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <span
-                    className={clsx(
-                      'text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border inline-block',
-                      CATEGORY_COLORS[selectedNode.category]?.bg || DEFAULT_CATEGORY_COLOR.bg,
-                      CATEGORY_COLORS[selectedNode.category]?.text || DEFAULT_CATEGORY_COLOR.text,
-                      CATEGORY_COLORS[selectedNode.category]?.border || DEFAULT_CATEGORY_COLOR.border
-                    )}
-                  >
-                    {selectedNode.category || 'Core Concept'}
-                  </span>
-                  <h3 className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">
-                    {selectedNode.label}
-                  </h3>
-                </div>
-
-                <button
-                  onClick={() => setSelectedNode(null)}
-                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Description Card */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-teal-600 dark:text-teal-400">
-                  <Info className="w-3.5 h-3.5" />
-                  <span>Concept Overview</span>
-                </div>
-                <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                  {selectedNode.description}
-                </p>
-              </div>
-
-              {/* Keywords / Entity Tags */}
-              {selectedNode.keywords && selectedNode.keywords.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    <Tag className="w-3.5 h-3.5 text-teal-500" />
-                    <span>Key Entities & Terms</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {selectedNode.keywords.map((kw, i) => (
-                      <span
-                        key={i}
-                        className="px-2.5 py-1 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-700 dark:text-teal-300 text-xs font-mono font-medium"
-                      >
-                        {kw}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Child Nodes List */}
-              {selectedNode.children && selectedNode.children.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    <Layers className="w-3.5 h-3.5 text-cyan-500" />
-                    <span>Sub-Components ({selectedNode.children.length})</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {selectedNode.children.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => setSelectedNode(c)}
-                        className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 hover:bg-teal-50 dark:hover:bg-teal-950/30 border border-slate-200 dark:border-slate-800 text-left transition-colors group"
-                      >
-                        <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-teal-600 dark:group-hover:text-teal-300 truncate">
-                          {c.label}
-                        </span>
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-teal-500" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 1-Click Action: Ask AI about this concept */}
-            <div className="pt-6 border-t border-slate-200 dark:border-slate-800 space-y-2">
-              <button
-                onClick={() => {
-                  setActiveTab('chat');
-                  toast.success(`Switched to Chat! Ask about "${selectedNode.label}" 💬`);
-                }}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 !text-white text-xs font-bold shadow-lg shadow-teal-600/25 transition-all active:scale-98"
-              >
-                <MessageSquare className="w-4 h-4 !text-white" />
-                <span>Ask AI About This Concept</span>
-              </button>
-            </div>
-          </div>
         )}
 
+        {/* ── React Flow Interactive Canvas ── */}
+        <div ref={reactFlowWrapper} className="flex-1 h-full w-full relative bg-[#070b14]">
+          {nodes.length > 0 ? (
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              nodeTypes={nodeTypes}
+              fitView
+              minZoom={0.2}
+              maxZoom={2.5}
+              proOptions={{ hideAttribution: true }}
+              className="dark"
+            >
+              <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} color="#1e293b" />
+              <Controls className="!bg-[#0f172a]/90 !border-slate-700 !shadow-xl !rounded-2xl !p-1 !text-slate-200" />
+              <MiniMap
+                nodeColor={(n) => (n.data?.isRoot ? '#14b8a6' : '#06b6d4')}
+                maskColor="rgba(7, 11, 20, 0.75)"
+                className="!bg-[#0d1424]/90 !border !border-slate-800 !rounded-2xl !shadow-2xl overflow-hidden"
+              />
+
+              {/* Top-Right Canvas Info Overlay */}
+              <Panel position="top-right" className="bg-[#0f172a]/80 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-800 text-[11px] text-slate-400 font-mono space-y-0.5 shadow-lg">
+                <div className="flex items-center gap-2 text-teal-400 font-bold">
+                  <Compass className="w-3.5 h-3.5" />
+                  <span>Interactive Node Canvas</span>
+                </div>
+                <div>Drag nodes • Double-click node to edit • Zoom freely</div>
+              </Panel>
+            </ReactFlow>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4 max-w-md mx-auto">
+              <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-teal-500/20 to-cyan-500/20 border border-teal-500/30 flex items-center justify-center text-teal-400 shadow-xl shadow-teal-500/10">
+                <Network className="w-8 h-8 animate-pulse" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-bold text-white">No Knowledge Graph Generated Yet</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Select documents on the left sidebar and click <strong>Generate Graph</strong> to construct an interactive concept network.
+                </p>
+              </div>
+              <button
+                onClick={handleGenerateMindMap}
+                disabled={isLoading || selectedDocumentIds.length === 0}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 via-cyan-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-teal-500/20 transition-all hover:scale-105"
+              >
+                Synthesize Graph Now
+              </button>
+            </div>
+          )}
+
+          {/* ── Concept Inspector & Node Editor Side Drawer ── */}
+          {selectedNode && (
+            <div className="absolute top-4 right-4 bottom-4 w-84 sm:w-96 rounded-3xl bg-[#0d1424]/95 border border-slate-700/80 shadow-2xl backdrop-blur-2xl p-6 z-20 flex flex-col justify-between animate-fade-in text-xs space-y-4 overflow-y-auto custom-scrollbar">
+              
+              {/* EDIT MODE */}
+              {isEditingNode ? (
+                <div className="space-y-4 flex-1">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Edit3 className="w-4 h-4 text-teal-400" />
+                      <h2 className="text-sm font-bold text-white">Edit Concept Node</h2>
+                    </div>
+                    <button
+                      onClick={() => setIsEditingNode(false)}
+                      className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Concept Label */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Concept Title</label>
+                    <input
+                      type="text"
+                      value={editLabel}
+                      onChange={(e) => setEditLabel(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+
+                  {/* Category Selector */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Category Pillar</label>
+                    <select
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-teal-400 text-xs focus:outline-none focus:border-teal-500"
+                    >
+                      {CATEGORIES.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Description</label>
+                    <textarea
+                      rows={3}
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+
+                  {/* Keywords Tag Manager */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Semantic Tags</label>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {editKeywords.map((kw, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 rounded-lg bg-slate-800 border border-slate-700 text-teal-300 font-mono text-[10px] flex items-center gap-1"
+                        >
+                          #{kw}
+                          <button
+                            onClick={() => setEditKeywords(editKeywords.filter((_, idx) => idx !== i))}
+                            className="hover:text-rose-400"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={newKeywordInput}
+                        onChange={(e) => setNewKeywordInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newKeywordInput.trim()) {
+                            e.preventDefault();
+                            if (!editKeywords.includes(newKeywordInput.trim())) {
+                              setEditKeywords([...editKeywords, newKeywordInput.trim()]);
+                            }
+                            setNewKeywordInput('');
+                          }
+                        }}
+                        placeholder="Type tag & press Enter..."
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Apply / Cancel Buttons */}
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      onClick={handleApplyNodeEdit}
+                      className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold transition-all shadow-md shadow-teal-600/20"
+                    >
+                      Apply to Canvas
+                    </button>
+                    <button
+                      onClick={() => setIsEditingNode(false)}
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : isAddingChild ? (
+                /* ADD CHILD SUB-CONCEPT MODE */
+                <div className="space-y-4 flex-1">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Plus className="w-4 h-4 text-cyan-400" />
+                      <h2 className="text-sm font-bold text-white">Add Sub-Concept</h2>
+                    </div>
+                    <button
+                      onClick={() => setIsAddingChild(false)}
+                      className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-400">
+                    Adding child node under <strong className="text-teal-400">"{selectedNode.label}"</strong>
+                  </div>
+
+                  {/* Concept Label */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Sub-Concept Title</label>
+                    <input
+                      type="text"
+                      value={childLabel}
+                      onChange={(e) => setChildLabel(e.target.value)}
+                      placeholder="e.g. Distributed Lock Mechanism"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  {/* Category Selector */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Category</label>
+                    <select
+                      value={childCategory}
+                      onChange={(e) => setChildCategory(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-teal-400 text-xs focus:outline-none focus:border-cyan-500"
+                    >
+                      {CATEGORIES.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Description / Notes</label>
+                    <textarea
+                      rows={3}
+                      value={childDescription}
+                      onChange={(e) => setChildDescription(e.target.value)}
+                      placeholder="What this concept does..."
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  {/* Add / Cancel Buttons */}
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      onClick={handleAddChildToSelected}
+                      disabled={!childLabel.trim()}
+                      className="flex-1 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold transition-all shadow-md shadow-cyan-600/20 disabled:opacity-50"
+                    >
+                      Add Node
+                    </button>
+                    <button
+                      onClick={() => setIsAddingChild(false)}
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* VIEW / INSPECT MODE */
+                <div className="space-y-4 flex-1">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-3">
+                    <div className="space-y-1">
+                      <span className="px-2.5 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-400 text-[10px] font-bold uppercase tracking-wider font-mono">
+                        {selectedNode.category || 'Concept Node'}
+                      </span>
+                      <h2 className="text-base font-black text-white leading-tight">
+                        {selectedNode.label}
+                      </h2>
+                    </div>
+                    <button
+                      onClick={() => setSelectedNode(null)}
+                      className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Actions Toolbar: Edit Node, Add Child, Delete */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsEditingNode(true)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold transition-colors"
+                      title="Edit Node Title, Description, and Category"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-teal-400" />
+                      <span>Edit Node</span>
+                    </button>
+
+                    <button
+                      onClick={() => setIsAddingChild(true)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold transition-colors"
+                      title="Add child concept node"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Add Child</span>
+                    </button>
+
+                    {!selectedNode.isRoot && (
+                      <button
+                        onClick={handleDeleteSelectedNode}
+                        className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-colors"
+                        title="Delete this branch from graph"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Info className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Concept Description</span>
+                    </span>
+                    <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800">
+                      {selectedNode.description || 'No detailed description available.'}
+                    </p>
+                  </div>
+
+                  {/* Keywords Tags */}
+                  {selectedNode.keywords && selectedNode.keywords.length > 0 && (
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5 text-teal-400" />
+                        <span>Associated Semantic Tags</span>
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {selectedNode.keywords.map((kw, i) => (
+                          <span
+                            key={i}
+                            className="px-2.5 py-1 rounded-xl bg-slate-800 border border-slate-700/80 text-teal-300 font-mono text-[11px]"
+                          >
+                            #{kw}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 1-Click AI Assistant Launcher */}
+              {!isEditingNode && !isAddingChild && (
+                <div className="pt-4 border-t border-slate-800 space-y-2">
+                  <button
+                    onClick={() => handleAskAiAboutConcept(selectedNode.label)}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-teal-600 via-cyan-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 text-white font-bold shadow-lg shadow-teal-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span>{copiedPrompt ? 'Prompt Copied! Opening...' : 'Ask AI About This Concept'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+
       </div>
 
-      {/* ── 4. Saved Mind Maps Modal ── */}
+      {/* ── Saved Mind Maps Vault Modal ── */}
       {showSavedModal && (
-        <div
-          onClick={() => setShowSavedModal(false)}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in">
+          <div className="w-full max-w-2xl rounded-3xl bg-[#0d1424] border border-slate-700 p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
-                  <Database className="w-5 h-5" />
+                <div className="p-2 rounded-xl bg-teal-500/10 text-teal-400 border border-teal-500/30">
+                  <FolderOpen className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    Saved Mind Maps (PostgreSQL)
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Revisit any previously synthesized concept map instantly.
-                  </p>
+                  <h3 className="text-base font-bold text-white">Knowledge Graph Vault</h3>
+                  <p className="text-xs text-slate-400">Persisted concept graphs in PostgreSQL</p>
                 </div>
               </div>
-
               <button
                 onClick={() => setShowSavedModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
               >
                 ✕
               </button>
             </div>
 
-            {/* Modal Body List */}
-            <div className="p-6 overflow-y-auto space-y-3 flex-1 custom-scrollbar">
-              {isLoadingSaved ? (
-                <div className="text-center py-12 space-y-2">
-                  <RefreshCw className="w-6 h-6 text-purple-500 animate-spin mx-auto" />
-                  <p className="text-xs text-slate-500">Loading saved records...</p>
-                </div>
-              ) : savedMindMaps.length === 0 ? (
-                <div className="text-center py-12 space-y-2">
-                  <FolderOpen className="w-10 h-10 text-slate-400 mx-auto opacity-50" />
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">No Saved Records Yet</h4>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                    Generate your first Concept Mind Map and it will automatically be saved to PostgreSQL here!
-                  </p>
-                </div>
-              ) : (
-                savedMindMaps.map((map) => {
-                  const dateStr = map.createdAt
-                    ? new Date(map.createdAt).toLocaleString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    : 'Saved';
-
-                  return (
-                    <div
-                      key={map.id}
-                      onClick={() => handleLoadSavedMap(map)}
-                      className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-teal-500/50 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-teal-50/30 dark:hover:bg-teal-950/20 transition-all cursor-pointer flex items-center justify-between gap-4 group"
-                    >
-                      <div className="space-y-1.5 min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                            {map.title}
-                          </h4>
-                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
-                            {map.totalNodes} Nodes
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3 text-slate-400" />
-                            <span>{dateStr}</span>
-                          </span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1">
-                            <FileText className="w-3 h-3 text-teal-500" />
-                            <span>
-                              {map.documentNames && map.documentNames.length > 0
-                                ? map.documentNames.join(', ')
-                                : 'Knowledge Base'}
-                            </span>
-                          </span>
-                          {map.tokensUsed !== undefined && (
-                            <>
-                              <span>•</span>
-                              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-mono">
-                                <Zap className="w-3 h-3" />
-                                <span>{map.tokensUsed.toLocaleString()} tokens</span>
-                              </span>
-                            </>
-                          )}
-                        </div>
+            {/* List */}
+            <div className="max-h-96 overflow-y-auto custom-scrollbar space-y-2.5 pr-1">
+              {savedMindMaps.length > 0 ? (
+                savedMindMaps.map((map) => (
+                  <div
+                    key={map.id}
+                    onClick={() => {
+                      setMindMapData(map);
+                      setCollapsedNodes(new Set());
+                      setSelectedNode(null);
+                      setHasUnsavedChanges(false);
+                      setShowSavedModal(false);
+                      toast.success(`Loaded Knowledge Graph "${map.title}"`);
+                    }}
+                    className="p-4 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-teal-500/40 transition-all cursor-pointer flex items-center justify-between group"
+                  >
+                    <div className="space-y-1">
+                      <div className="font-bold text-white group-hover:text-teal-300 transition-colors text-sm">
+                        {map.title}
                       </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                          onClick={(e) => handleDeleteSavedMap(map.id!, e)}
-                          className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors"
-                          title="Delete saved record"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-
-                        <button
-                          onClick={() => handleLoadSavedMap(map)}
-                          className="px-3.5 py-1.5 rounded-xl bg-teal-600 group-hover:bg-teal-500 text-white text-xs font-bold shadow-md transition-all inline-flex items-center gap-1"
-                        >
-                          <span>Open</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
+                      <div className="text-xs text-slate-400 flex items-center gap-3">
+                        <span>📊 {map.totalNodes} Nodes</span>
+                        <span>📅 {new Date(map.createdAt).toLocaleDateString()}</span>
+                        <span>⚡ {map.tokensUsed} tokens</span>
                       </div>
                     </div>
-                  );
-                })
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => handleDeleteMindMap(map.id, e)}
+                        className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all"
+                        title="Delete from Vault"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-10 text-slate-500 text-xs">
+                  No saved knowledge graphs in your vault yet.
+                </div>
               )}
             </div>
           </div>
