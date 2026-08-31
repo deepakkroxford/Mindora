@@ -19,4 +19,5 @@ public class ChatResponseDto {
     private Integer completionTokens;
     private Integer totalTokens;
     private Boolean isCached;
+    private List<String> suggestedQuestions;
 }
