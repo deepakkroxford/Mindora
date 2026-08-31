@@ -31,6 +31,17 @@ export interface DocumentResponseDto {
   message: string;
 }
 
+export interface DocumentDiagramDto {
+  id: string;
+  documentId: string;
+  documentName?: string;
+  pageNumber: number;
+  imageUrl: string;
+  width: number;
+  height: number;
+  caption?: string;
+}
+
 export interface CitationDto {
   documentId: string;
   fileName: string;
@@ -39,6 +50,7 @@ export interface CitationDto {
   snippet: string;
   similarityScore: number;
   metadata: Record<string, unknown>;
+  diagrams?: DocumentDiagramDto[];
 }
 
 export interface ChatRequestDto {
@@ -55,6 +67,7 @@ export interface ChatResponseDto {
   answer: string;
   conversationId: string;
   citations: CitationDto[];
+  diagrams?: DocumentDiagramDto[];
   responseTimeMs: number;
   similarityScore?: number | null;
   promptTokens?: number | null;
@@ -144,6 +157,7 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   citations?: CitationDto[];
+  diagrams?: DocumentDiagramDto[];
   responseTimeMs?: number;
   similarityScore?: number | null;
   promptTokens?: number | null;

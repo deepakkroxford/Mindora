@@ -5,15 +5,16 @@ import {
   AlertTriangle, ThumbsUp, ThumbsDown, MoreHorizontal, MessageSquare, Globe,
   HelpCircle, Lightbulb, Compass, FileCheck, BarChart3, Cpu, Target,
   Download, FileCode, Edit2, ShieldAlert, Mic, MicOff, Volume2, VolumeX,
-  ExternalLink, GraduationCap,
+  ExternalLink, GraduationCap, Image as ImageIcon,
 } from 'lucide-react';
-import { chatApi } from '../services/api';
+import { chatApi, diagramApi } from '../services/api';
 import { useApp } from '../context/AppContext';
-import type { Message, CitationDto } from '../types';
+import type { Message, CitationDto, DocumentDiagramDto } from '../types';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import ChatAnalyticsModal from './ChatAnalyticsModal';
 import CitationDetailModal from './CitationDetailModal';
+import DiagramLightboxModal from './DiagramLightboxModal';
 
 /* ─── Prompt templates ──────────────────────────────────────────── */
 const PROMPT_TEMPLATES = [
@@ -363,6 +364,7 @@ interface MessageBubbleProps {
   isLastAssistant?: boolean;
   onRegenerate?: (msg: Message) => void;
   onInspectCitation?: (citation: CitationDto, index: number) => void;
+  onOpenDiagram?: (diagram: DocumentDiagramDto) => void;
   onSelectPrompt?: (prompt: string) => void;
   onSaveEdit?: (msgId: string, newContent: string) => void;
   userName?: string;
@@ -373,6 +375,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   isLastAssistant,
   onRegenerate,
   onInspectCitation,
+  onOpenDiagram,
   onSelectPrompt,
   onSaveEdit,
   userName,
@@ -387,6 +390,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   useEffect(() => {
     setEditText(message.content);
   }, [message.content]);
+
+  const messageDiagrams = useMemo(() => {
+    const directDiagrams = message.diagrams || [];
+    const citationDiagrams = message.citations?.flatMap((c) => c.diagrams || []) || [];
+    const map = new Map<string, DocumentDiagramDto>();
+    [...directDiagrams, ...citationDiagrams].forEach((d) => {
+      if (d && d.id) map.set(d.id, d);
+    });
+    return Array.from(map.values());
+  }, [message.diagrams, message.citations]);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
@@ -627,13 +640,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 )}
               </div>
 
-              {/* Action Buttons: Feedback, Retry, Copy */}
-              <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="flex items-center gap-1">
                 <button
                   onClick={() => handleFeedback('like')}
                   className={clsx(
-                    'p-1 rounded transition-colors',
-                    feedback === 'like' ? 'text-teal-400 bg-teal-500/20' : 'text-slate-500 hover:text-teal-400 hover:bg-slate-800'
+                    'p-1.5 rounded-lg transition-colors',
+                    feedback === 'like'
+                      ? 'text-teal-400 bg-teal-500/20'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                   )}
                   title="Helpful response"
                 >
@@ -642,8 +656,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <button
                   onClick={() => handleFeedback('dislike')}
                   className={clsx(
-                    'p-1 rounded transition-colors',
-                    feedback === 'dislike' ? 'text-rose-400 bg-rose-500/20' : 'text-slate-500 hover:text-rose-400 hover:bg-slate-800'
+                    'p-1.5 rounded-lg transition-colors',
+                    feedback === 'dislike'
+                      ? 'text-rose-400 bg-rose-500/20'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                   )}
                   title="Unhelpful response"
                 >
@@ -684,6 +700,47 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </div>
           )}
         </div>
+
+        {/* ── Referenced Architecture Diagrams & Visuals ── */}
+        {messageDiagrams.length > 0 && (
+          <div className="mt-3 pl-1 space-y-2 animate-fade-in">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-cyan-400 tracking-wide uppercase">
+              <ImageIcon className="w-3.5 h-3.5" />
+              <span>Referenced Architecture Diagrams ({messageDiagrams.length})</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-xl">
+              {messageDiagrams.map((diag) => (
+                <div
+                  key={diag.id}
+                  onClick={() => onOpenDiagram?.(diag)}
+                  className="group relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/90 hover:border-cyan-500/50 transition-all cursor-pointer shadow-md hover:shadow-cyan-500/10"
+                >
+                  <div className="h-32 w-full bg-slate-950/60 overflow-hidden flex items-center justify-center p-2">
+                    <img
+                      src={diag.imageUrl}
+                      alt={diag.caption || 'Architecture Diagram'}
+                      className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-200"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div className="p-2.5 border-t border-slate-800/80 bg-slate-900/90 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-200 truncate group-hover:text-cyan-300">
+                        {diag.caption || 'System Diagram'}
+                      </p>
+                      <span className="text-[10px] text-slate-400">
+                        Page {diag.pageNumber} • {diag.documentName || 'Document'}
+                      </span>
+                    </div>
+                    <span className="p-1 rounded-lg bg-cyan-500/10 text-cyan-400 text-xs font-bold flex-shrink-0 group-hover:bg-cyan-500 group-hover:text-white transition-colors">
+                      🔍
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Verified Citations Drawer */}
         {message.citations && message.citations.length > 0 && (
@@ -777,6 +834,7 @@ const ChatView: React.FC = () => {
   const [showDocScopeMenu, setShowDocScopeMenu] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [inspectingCitation, setInspectingCitation] = useState<{ citation: CitationDto; index: number } | null>(null);
+  const [activeLightboxDiagram, setActiveLightboxDiagram] = useState<DocumentDiagramDto | null>(null);
   const [starterPrompts, setStarterPrompts] = useState<string[]>([]);
   const [isLoadingStarterPrompts, setIsLoadingStarterPrompts] = useState(false);
 
@@ -1011,6 +1069,18 @@ const ChatView: React.FC = () => {
         console.debug('Could not load follow-up suggestions', err);
       });
 
+      // Fetch diagrams for scoped documents in streaming mode
+      const targetDocId = selectedDocumentId || (selectedDocumentIds.length > 0 ? selectedDocumentIds[0] : null);
+      if (targetDocId) {
+        diagramApi.getByDocument(targetDocId).then((dRes) => {
+          if (dRes.data && dRes.data.length > 0) {
+            setMessages((prev) =>
+              prev.map((m) => m.id === msgId ? { ...m, diagrams: dRes.data } : m)
+            );
+          }
+        }).catch(() => {});
+      }
+
       // Refresh conversation list and maintain conversationId for conversational memory
       try {
         const convList = await fetchConversations();
@@ -1063,6 +1133,7 @@ const ChatView: React.FC = () => {
           role: 'assistant',
           content: res.data.answer,
           citations: res.data.citations,
+          diagrams: res.data.diagrams,
           responseTimeMs: res.data.responseTimeMs,
           similarityScore: res.data.similarityScore,
           promptTokens: res.data.promptTokens,
@@ -1407,6 +1478,7 @@ const ChatView: React.FC = () => {
               onRegenerate={handleRegenerate}
               onSaveEdit={handleSaveEdit}
               onInspectCitation={(citation, idx) => setInspectingCitation({ citation, index: idx })}
+              onOpenDiagram={(diag) => setActiveLightboxDiagram(diag)}
               onSelectPrompt={(prompt) => sendMessage(prompt)}
               userName={currentUser?.name}
             />
@@ -1724,6 +1796,12 @@ const ChatView: React.FC = () => {
         onClose={() => setInspectingCitation(null)}
         citation={inspectingCitation?.citation ?? null}
         citationIndex={inspectingCitation?.index}
+      />
+
+      {/* ── Interactive Architecture Diagram Lightbox Modal ── */}
+      <DiagramLightboxModal
+        diagram={activeLightboxDiagram}
+        onClose={() => setActiveLightboxDiagram(null)}
       />
     </div>
   );

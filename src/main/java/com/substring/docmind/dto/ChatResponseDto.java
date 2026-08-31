@@ -20,4 +20,5 @@ public class ChatResponseDto {
     private Integer totalTokens;
     private Boolean isCached;
     private List<String> suggestedQuestions;
+    private List<DocumentDiagramDto> diagrams;
 }

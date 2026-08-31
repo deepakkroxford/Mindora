@@ -20,24 +20,35 @@ Mindora is a production-grade Document Intelligence and Question-Answering syste
 * **Async AI Title Generator**: The LLM automatically generates a concise 3–5 word topic title (e.g., *"PromptCraft Architecture Summary"*) in the background.
 * **1-Click Export**: Export conversation transcripts to **Markdown (`.md`)** or **JSON (`.json`)**.
 
-### 4. 📚 Multi-Document Scoping & Cross-Document Comparison (Multi-RAG)
+### 4. 🧠 Interactive Mind Map & Concept Hierarchy Visualizer
+* Generates an **interactive draggable concept tree** from document vector chunks with smooth SVG Bézier curves, pan & zoom, branch collapse/expand, and a **Concept Inspector Drawer**.
+* **1-Click Ask AI**: Select any concept node to immediately ask targeted inquiries.
+* **Multi-Format Export**: Download knowledge trees as **PNG**, **SVG**, or **Markdown (`.md`)**.
+* **Redis + DB Cache**: 24-hour Redis caching + PostgreSQL record persistence with exact token telemetry.
+
+### 5. 🖼️ Multi-Modal Image & Architecture Diagram Citations
+* **Apache PDFBox 3.x Extraction**: Automatically extracts high-resolution embedded architecture diagrams, workflow charts, and system designs during document ingestion.
+* **Inline Chat Citations**: Embeds diagram preview cards directly in the assistant chat bubble when answering related questions.
+* **Interactive Lightbox Modal**: Full-screen modal with **Zoom (up to 400%)**, **Pan & Drag**, **Rotate 90°**, and **1-Click Download**.
+
+### 6. 🎓 Active Recall Study Hub & AI Quiz Generator
+* Automatically creates **multiple-choice quizzes** and **3D flip flashcard decks** from document chunks with instant grading, score percentages, and source explanations.
+
+### 7. 📚 Multi-Document Scoping & Cross-Document Comparison (Multi-RAG)
 * Select multiple documents via checkboxes or the chat scope dropdown to perform comparative analysis (e.g. comparing contracts, candidate resumes, or architecture specifications side-by-side).
 
-### 5. 🎙️ Real-Time Voice Chat & Read Aloud Audio AI
+### 8. 🎙️ Real-Time Voice Chat & Read Aloud Audio AI
 * **Speech-to-Text (STT)**: Speak questions directly into your microphone with live waveform feedback.
 * **Text-to-Speech (TTS)**: 1-click audio reading of responses with markdown cleaning.
 
-### 6. 📑 Click-to-Highlight Citation Deep-Dive
+### 9. 📑 Click-to-Highlight Citation Deep-Dive
 * Verified citations showing page numbers, chunk indices, and similarity match percentages.
 * 1-click modal inspector displaying full extracted passage snippets and raw JSON vector embedding metadata.
 
-### 7. ⚡ Redis Semantic Caching & Distributed Rate Limiter
+### 10. ⚡ Redis Semantic Caching & Distributed Rate Limiter
 * **Sub-15ms Latency & $0 Cost**: Identical or scoped queries hit Redis cache and return instantaneously with 0 LLM token cost.
 * **Targeted Invalidation**: Deleting or re-indexing documents automatically clears associated cached queries.
 * **Distributed Token Bucket**: Enforces cluster-wide rate limits (30 chat queries/min, 10 uploads/min) across load-balanced instances.
-
-### 8. 📊 Live Token Analytics & Latency Telemetry
-* Visual breakdown of prompt vs completion tokens, response latency (TTFT), similarity score distributions, and `⚡ Cached` telemetry indicators.
 
 ---
 

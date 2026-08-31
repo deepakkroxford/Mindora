@@ -38,6 +38,7 @@ public class RagService {
     private final ConversationRepository conversationRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
+    private final DocumentDiagramRepository documentDiagramRepository;
     private final PlatformTransactionManager transactionManager;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -51,6 +52,7 @@ public class RagService {
             ConversationRepository conversationRepository,
             ChatMessageRepository chatMessageRepository,
             UserRepository userRepository,
+            DocumentDiagramRepository documentDiagramRepository,
             PlatformTransactionManager transactionManager,
             JdbcTemplate jdbcTemplate,
             ObjectMapper objectMapper,
@@ -62,6 +64,7 @@ public class RagService {
         this.conversationRepository = conversationRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.userRepository = userRepository;
+        this.documentDiagramRepository = documentDiagramRepository;
         this.transactionManager = transactionManager;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
@@ -340,10 +343,17 @@ public class RagService {
                 completionTokens, totalTokens);
         String convIdResult = savedConv != null ? savedConv.getId().toString() : request.getConversationId();
 
+        List<DocumentDiagramDto> responseDiagrams = citationDtos.stream()
+                .filter(c -> c.getDiagrams() != null)
+                .flatMap(c -> c.getDiagrams().stream())
+                .distinct()
+                .collect(Collectors.toList());
+
         ChatResponseDto finalResponse = ChatResponseDto.builder()
                 .answer(answer)
                 .conversationId(convIdResult)
                 .citations(citationDtos)
+                .diagrams(responseDiagrams)
                 .responseTimeMs(responseTime)
                 .similarityScore(topSimilarityScore)
                 .promptTokens(promptTokens)
@@ -437,11 +447,18 @@ public class RagService {
                         }
                     }
 
+                    List<DocumentDiagramDto> streamDiagrams = citationDtos.stream()
+                            .filter(c -> c.getDiagrams() != null)
+                            .flatMap(c -> c.getDiagrams().stream())
+                            .distinct()
+                            .collect(Collectors.toList());
+
                     // Cache streaming response in Redis
                     ChatResponseDto toCache = ChatResponseDto.builder()
                             .answer(answer)
                             .conversationId(requestDto.getConversationId())
                             .citations(citationDtos)
+                            .diagrams(streamDiagrams)
                             .responseTimeMs(0L)
                             .similarityScore(topSimilarityScore)
                             .promptTokens(promptTokens)
@@ -608,9 +625,29 @@ public class RagService {
             score = n.doubleValue();
         }
 
+        List<DocumentDiagramDto> diagramDtos = new ArrayList<>();
+        if (docId != null && pageNumber != null) {
+            try {
+                diagramDtos = documentDiagramRepository.findByDocumentIdAndPageNumber(docId, pageNumber)
+                        .stream()
+                        .map(d -> DocumentDiagramDto.builder()
+                                .id(d.getId())
+                                .documentId(d.getDocumentId())
+                                .documentName((String) meta.getOrDefault("fileName", "Document"))
+                                .pageNumber(d.getPageNumber())
+                                .imageUrl("/api/v1/diagrams/" + d.getId() + "/image")
+                                .width(d.getWidth())
+                                .height(d.getHeight())
+                                .caption(d.getCaption())
+                                .build())
+                        .collect(Collectors.toList());
+            } catch (Exception ignore) {
+            }
+        }
+
         return CitationDto.builder().documentId(docId).fileName((String) meta.getOrDefault("fileName", "Unknown"))
                 .chunkIndex(chunkIndex).pageNumber(pageNumber).snippet(document.getText()).similarityScore(score)
-                .metadata(meta).build();
+                .metadata(meta).diagrams(diagramDtos).build();
     }
 
     /**
