@@ -5,14 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.substring.docmind.config.AppProperties;
 import com.substring.docmind.dto.*;
 import jakarta.validation.constraints.NotBlank;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -21,7 +19,6 @@ import reactor.core.publisher.Flux;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
-import java.time.LocalDateTime;
 
 import com.substring.docmind.entity.*;
 import com.substring.docmind.repository.*;
@@ -58,8 +55,7 @@ public class RagService {
             JdbcTemplate jdbcTemplate,
             ObjectMapper objectMapper,
             SemanticCacheService semanticCacheService,
-            RedisRateLimitingService redisRateLimitingService
-    ) {
+            RedisRateLimitingService redisRateLimitingService) {
         this.vectorStore = vectorStore;
         this.appProperties = appProperties;
         this.chatClient = chatClient;
@@ -77,12 +73,14 @@ public class RagService {
      * Approximate token estimation (~3.8 characters per token)
      */
     private int estimateTokens(String text) {
-        if (text == null || text.isBlank()) return 0;
+        if (text == null || text.isBlank())
+            return 0;
         return Math.max(1, (int) Math.ceil(text.length() / 3.8));
     }
 
     /**
-     * Consolidates single documentId and multi-document documentIds list into a unified list of UUIDs.
+     * Consolidates single documentId and multi-document documentIds list into a
+     * unified list of UUIDs.
      */
     private List<UUID> resolveEffectiveDocIds(UUID singleId, List<UUID> multiIds) {
         Set<UUID> ids = new LinkedHashSet<>();
@@ -96,12 +94,15 @@ public class RagService {
     }
 
     /**
-     * Background async LLM title generator: replaces truncated prompts with crisp 3-5 word titles.
+     * Background async LLM title generator: replaces truncated prompts with crisp
+     * 3-5 word titles.
      */
     private void generateAndSaveAiTitle(UUID conversationId, String promptText) {
-        if (conversationId == null || promptText == null || promptText.isBlank()) return;
+        if (conversationId == null || promptText == null || promptText.isBlank())
+            return;
         try {
-            String titlePrompt = "Generate a concise, professional conversation title (maximum 3 to 5 words, no quotation marks, no preamble like 'Title:', no trailing period) that captures the core subject of this user inquiry: \"" + promptText + "\"";
+            String titlePrompt = "Generate a concise, professional conversation title (maximum 3 to 5 words, no quotation marks, no preamble like 'Title:', no trailing period) that captures the core subject of this user inquiry: \""
+                    + promptText + "\"";
             var response = chatClient.prompt().user(titlePrompt).call().content();
             if (response != null && !response.isBlank()) {
                 String cleanTitle = response.trim()
@@ -129,8 +130,10 @@ public class RagService {
     }
 
     /**
-     * Helper method to find or create a conversation and save the chat question & answer with token metadata.
-     * Uses TransactionTemplate to ensure commits succeed on both synchronous request threads and async Reactor stream threads.
+     * Helper method to find or create a conversation and save the chat question &
+     * answer with token metadata.
+     * Uses TransactionTemplate to ensure commits succeed on both synchronous
+     * request threads and async Reactor stream threads.
      */
     public Conversation saveConversationAndMessage(
             String email,
@@ -139,8 +142,7 @@ public class RagService {
             List<CitationDto> citationDtos,
             Integer promptTokens,
             Integer completionTokens,
-            Integer totalTokens
-    ) {
+            Integer totalTokens) {
         if (email == null || email.equals("anonymousUser")) {
             log.warn("Cannot save conversation: unauthenticated user ({})", email);
             return null;
@@ -173,12 +175,13 @@ public class RagService {
 
                 Conversation conversation = null;
                 if (conversationUuid != null) {
-                    conversation = conversationRepository.findByIdAndUserId(conversationUuid, user.getId()).orElse(null);
+                    conversation = conversationRepository.findByIdAndUserId(conversationUuid, user.getId())
+                            .orElse(null);
                 }
 
                 if (conversation == null) {
-                    String initialTitle = request.getQuestion().length() > 60 
-                            ? request.getQuestion().substring(0, 57) + "..." 
+                    String initialTitle = request.getQuestion().length() > 60
+                            ? request.getQuestion().substring(0, 57) + "..."
                             : request.getQuestion();
                     conversation = Conversation.builder()
                             .user(user)
@@ -186,7 +189,8 @@ public class RagService {
                             .messageCount(0)
                             .build();
                     conversation = conversationRepository.saveAndFlush(conversation);
-                    log.info("Created new conversation: id={}, title='{}' for user={}", conversation.getId(), initialTitle, email);
+                    log.info("Created new conversation: id={}, title='{}' for user={}", conversation.getId(),
+                            initialTitle, email);
 
                     // Trigger async background LLM title generation
                     final UUID convIdForAsync = conversation.getId();
@@ -231,9 +235,10 @@ public class RagService {
      * Detects if the query is a document-level summary or overview request.
      */
     private boolean isSummaryIntent(String question) {
-        if (question == null || question.isBlank()) return false;
+        if (question == null || question.isBlank())
+            return false;
         String q = question.toLowerCase().trim();
-        return q.contains("summar") || q.contains("overview") || q.contains("key points") 
+        return q.contains("summar") || q.contains("overview") || q.contains("key points")
                 || q.contains("action items") || q.contains("findings") || q.contains("clauses")
                 || q.contains("what is this document") || q.contains("explain this document")
                 || q.contains("tell me about this document") || q.contains("what does this document say")
@@ -252,15 +257,18 @@ public class RagService {
 
         // 1. Enforce distributed rate limiting
         if (!redisRateLimitingService.tryAcquireChat(email)) {
-            throw new com.substring.docmind.exception.RateLimitExceededException("⏳ You're asking questions too quickly! Please wait a minute and try again.");
+            throw new com.substring.docmind.exception.RateLimitExceededException(
+                    "⏳ You're asking questions too quickly! Please wait a minute and try again.");
         }
 
         List<UUID> effectiveDocIds = resolveEffectiveDocIds(request.getDocumentId(), request.getDocumentIds());
 
-        // 2. Check Redis Semantic / Exact Response Cache (<15ms hit) unless bypassCache is requested (e.g. Regenerate)
+        // 2. Check Redis Semantic / Exact Response Cache (<15ms hit) unless bypassCache
+        // is requested (e.g. Regenerate)
         boolean shouldBypassCache = Boolean.TRUE.equals(request.getBypassCache());
         if (!shouldBypassCache) {
-            Optional<ChatResponseDto> cachedOpt = semanticCacheService.getCachedResponse(request.getQuestion(), effectiveDocIds);
+            Optional<ChatResponseDto> cachedOpt = semanticCacheService.getCachedResponse(request.getQuestion(),
+                    effectiveDocIds);
             if (cachedOpt.isPresent()) {
                 ChatResponseDto cached = cachedOpt.get();
                 Conversation savedConv = saveConversationAndMessage(
@@ -274,7 +282,7 @@ public class RagService {
         }
 
         long startTime = System.currentTimeMillis();
-        log.info("Processing live query (bypassCache={}): '{}', scoped documentIds: {}, conversationId: {}", 
+        log.info("Processing live query (bypassCache={}): '{}', scoped documentIds: {}, conversationId: {}",
                 shouldBypassCache, request.getQuestion(), effectiveDocIds, request.getConversationId());
 
         List<Document> similarDocuments = this.retrieveRelevantDocuments(request.getQuestion(), effectiveDocIds,
@@ -293,7 +301,8 @@ public class RagService {
             isLowRelevance = similarDocuments.isEmpty() || (topSimilarityScore != null && topSimilarityScore < 0.45);
         }
 
-        // If Guardrail triggers (out-of-domain query), do not attach false citations from unrelated docs
+        // If Guardrail triggers (out-of-domain query), do not attach false citations
+        // from unrelated docs
         if (isLowRelevance) {
             citationDtos = Collections.emptyList();
         }
@@ -304,9 +313,10 @@ public class RagService {
         String prompt = buildPrompt(request.getQuestion(), contextText, conversationHistory, isLowRelevance);
 
         var chatResponse = this.chatClient.prompt().user(prompt).call().chatResponse();
-        String answer = chatResponse != null && chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null
-                ? chatResponse.getResult().getOutput().getText()
-                : "";
+        String answer = chatResponse != null && chatResponse.getResult() != null
+                && chatResponse.getResult().getOutput() != null
+                        ? chatResponse.getResult().getOutput().getText()
+                        : "";
 
         long responseTime = System.currentTimeMillis() - startTime;
         log.info("Completed Q&A in {} ms with {} citations", responseTime, citationDtos.size());
@@ -314,7 +324,8 @@ public class RagService {
         // Token usage calculation
         int promptTokens = estimateTokens(prompt);
         int completionTokens = estimateTokens(answer);
-        if (chatResponse != null && chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
+        if (chatResponse != null && chatResponse.getMetadata() != null
+                && chatResponse.getMetadata().getUsage() != null) {
             var usage = chatResponse.getMetadata().getUsage();
             if (usage.getPromptTokens() != null && usage.getPromptTokens() > 0) {
                 promptTokens = usage.getPromptTokens().intValue();
@@ -325,7 +336,8 @@ public class RagService {
         }
         int totalTokens = promptTokens + completionTokens;
 
-        Conversation savedConv = saveConversationAndMessage(email, request, answer, citationDtos, promptTokens, completionTokens, totalTokens);
+        Conversation savedConv = saveConversationAndMessage(email, request, answer, citationDtos, promptTokens,
+                completionTokens, totalTokens);
         String convIdResult = savedConv != null ? savedConv.getId().toString() : request.getConversationId();
 
         ChatResponseDto finalResponse = ChatResponseDto.builder()
@@ -354,7 +366,8 @@ public class RagService {
 
         // 1. Enforce distributed rate limiting
         if (!redisRateLimitingService.tryAcquireChat(email)) {
-            return Flux.error(new com.substring.docmind.exception.RateLimitExceededException("⏳ You're asking questions too quickly! Please wait a minute and try again."));
+            return Flux.error(new com.substring.docmind.exception.RateLimitExceededException(
+                    "⏳ You're asking questions too quickly! Please wait a minute and try again."));
         }
 
         List<UUID> effectiveDocIds = resolveEffectiveDocIds(requestDto.getDocumentId(), requestDto.getDocumentIds());
@@ -362,16 +375,18 @@ public class RagService {
         // 2. Check Redis Cache for Instant Stream unless bypassCache is requested
         boolean shouldBypassCache = Boolean.TRUE.equals(requestDto.getBypassCache());
         if (!shouldBypassCache) {
-            Optional<ChatResponseDto> cachedOpt = semanticCacheService.getCachedResponse(requestDto.getQuestion(), effectiveDocIds);
+            Optional<ChatResponseDto> cachedOpt = semanticCacheService.getCachedResponse(requestDto.getQuestion(),
+                    effectiveDocIds);
             if (cachedOpt.isPresent()) {
                 ChatResponseDto cached = cachedOpt.get();
                 saveConversationAndMessage(email, requestDto, cached.getAnswer(),
-                        cached.getCitations(), cached.getPromptTokens(), cached.getCompletionTokens(), cached.getTotalTokens());
+                        cached.getCitations(), cached.getPromptTokens(), cached.getCompletionTokens(),
+                        cached.getTotalTokens());
                 return Flux.just(cached.getAnswer());
             }
         }
 
-        log.info("Streaming query: '{}', scoped documentIds: {}, conversationId: {}", 
+        log.info("Streaming query: '{}', scoped documentIds: {}, conversationId: {}",
                 requestDto.getQuestion(), effectiveDocIds, requestDto.getConversationId());
 
         List<Document> relevantDocuments = retrieveRelevantDocuments(
@@ -381,7 +396,8 @@ public class RagService {
                 requestDto.getMinSimilarity());
 
         List<CitationDto> initialCitations = relevantDocuments.stream().map(this::mapToCitation).toList();
-        final Double topSimilarityScore = !initialCitations.isEmpty() ? initialCitations.get(0).getSimilarityScore() : null;
+        final Double topSimilarityScore = !initialCitations.isEmpty() ? initialCitations.get(0).getSimilarityScore()
+                : null;
 
         boolean isSummary = isSummaryIntent(requestDto.getQuestion());
         boolean isScoped = !effectiveDocIds.isEmpty();
@@ -414,7 +430,8 @@ public class RagService {
 
                     if (email != null && !email.equals("anonymousUser")) {
                         try {
-                            saveConversationAndMessage(email, requestDto, answer, citationDtos, promptTokens, completionTokens, totalTokens);
+                            saveConversationAndMessage(email, requestDto, answer, citationDtos, promptTokens,
+                                    completionTokens, totalTokens);
                         } catch (Exception e) {
                             log.error("Failed to save streaming message to conversation history for user {}", email, e);
                         }
@@ -437,7 +454,8 @@ public class RagService {
     }
 
     /**
-     * Retrieve recent conversation turns (up to last 4) for conversational memory context.
+     * Retrieve recent conversation turns (up to last 4) for conversational memory
+     * context.
      */
     private String buildConversationHistoryString(String conversationIdStr) {
         if (conversationIdStr == null || conversationIdStr.isBlank()) {
@@ -474,9 +492,11 @@ public class RagService {
     }
 
     /**
-     * Constructs prompt with Context Compression, Guardrails, and Conversational History.
+     * Constructs prompt with Context Compression, Guardrails, and Conversational
+     * History.
      */
-    private String buildPrompt(String question, String contextText, String conversationHistory, boolean isLowRelevance) {
+    private String buildPrompt(String question, String contextText, String conversationHistory,
+            boolean isLowRelevance) {
         StringBuilder sb = new StringBuilder();
 
         if (conversationHistory != null && !conversationHistory.isBlank()) {
@@ -489,10 +509,12 @@ public class RagService {
         if (isLowRelevance) {
             sb.append("⚠️ GUARDRAIL ENFORCEMENT: Out-of-Domain / Low Document Confidence\n");
             sb.append("---------------------\n");
-            sb.append("The question is not covered by the uploaded document context (No matching document content found).\n");
+            sb.append(
+                    "The question is not covered by the uploaded document context (No matching document content found).\n");
             sb.append("MANDATORY INSTRUCTIONS:\n");
             sb.append("1. You MUST begin the very first line of your response with exactly:\n");
-            sb.append("   'ℹ️ *This topic was not found in your uploaded documents. Answering with general model knowledge:*'\n");
+            sb.append(
+                    "   'ℹ️ *This topic was not found in your uploaded documents. Answering with general model knowledge:*'\n");
             sb.append("2. Provide an accurate, helpful answer using your broad general knowledge.\n");
             sb.append("3. Do NOT cite the uploaded document for this answer.\n");
             sb.append("---------------------\n\n");
@@ -507,9 +529,11 @@ public class RagService {
 
         sb.append("Current User Message / Question: ").append(question).append("\n\n");
         sb.append("Instructions:\n");
-        sb.append("- Pay attention to the recent conversation history to understand context, follow-up questions, pronouns, and previous dialogue.\n");
+        sb.append(
+                "- Pay attention to the recent conversation history to understand context, follow-up questions, pronouns, and previous dialogue.\n");
         if (contextText != null && !contextText.isBlank() && !isLowRelevance) {
-            sb.append("- Since the question relates to the document context above, prioritize answering using that context and reference key sections or data.\n");
+            sb.append(
+                    "- Since the question relates to the document context above, prioritize answering using that context and reference key sections or data.\n");
         }
         sb.append("- Respond helpfully, accurately, and conversationally using your broad knowledge base.\n");
 
@@ -517,8 +541,10 @@ public class RagService {
     }
 
     /**
-     * Latency-optimized Context builder: Caps character count (~3,500 chars / ~850 tokens)
-     * to keep Time-To-First-Token (TTFT) ultra-fast without overloading prompt length.
+     * Latency-optimized Context builder: Caps character count (~3,500 chars / ~850
+     * tokens)
+     * to keep Time-To-First-Token (TTFT) ultra-fast without overloading prompt
+     * length.
      */
     private String buildContextString(List<Document> similarDocuments) {
         if (similarDocuments == null || similarDocuments.isEmpty()) {
@@ -533,12 +559,14 @@ public class RagService {
             String fileName = (String) doc.getMetadata().getOrDefault("fileName", "Unknown File");
             Object page = doc.getMetadata().getOrDefault("pageNumber", "N/A");
             String chunkText = doc.getText();
-            if (chunkText == null || chunkText.isBlank()) continue;
+            if (chunkText == null || chunkText.isBlank())
+                continue;
 
             if (totalChars + chunkText.length() > MAX_CONTEXT_CHARS) {
                 int remaining = MAX_CONTEXT_CHARS - totalChars;
                 if (remaining > 150) {
-                    sb.append(String.format("[Source: %s | Page: %s]\n%s\n\n---\n\n", fileName, page, chunkText.substring(0, remaining) + "..."));
+                    sb.append(String.format("[Source: %s | Page: %s]\n%s\n\n---\n\n", fileName, page,
+                            chunkText.substring(0, remaining) + "..."));
                 }
                 break;
             }
@@ -586,17 +614,20 @@ public class RagService {
     }
 
     /**
-     * Fast direct retrieval of document chunks across one or multiple scoped documents for summarization/comparisons
+     * Fast direct retrieval of document chunks across one or multiple scoped
+     * documents for summarization/comparisons
      */
     private List<Document> getDocumentOverviewChunks(List<UUID> documentIds, int limit) {
         if (documentIds == null || documentIds.isEmpty()) {
             return Collections.emptyList();
         }
 
-        StringBuilder sql = new StringBuilder("SELECT id, content, metadata FROM vector_store WHERE (metadata->>'documentId' IN (");
+        StringBuilder sql = new StringBuilder(
+                "SELECT id, content, metadata FROM vector_store WHERE (metadata->>'documentId' IN (");
         List<Object> params = new ArrayList<>();
         for (int i = 0; i < documentIds.size(); i++) {
-            if (i > 0) sql.append(", ");
+            if (i > 0)
+                sql.append(", ");
             sql.append("?");
             params.add(documentIds.get(i).toString());
         }
@@ -611,8 +642,10 @@ public class RagService {
                 Map<String, Object> metadata = new HashMap<>();
                 if (metaJson != null && !metaJson.isBlank()) {
                     try {
-                        metadata = objectMapper.readValue(metaJson, new TypeReference<Map<String, Object>>() {});
-                    } catch (Exception ignore) {}
+                        metadata = objectMapper.readValue(metaJson, new TypeReference<Map<String, Object>>() {
+                        });
+                    } catch (Exception ignore) {
+                    }
                 }
                 metadata.put("similarityScore", 0.95);
                 metadata.put("matchType", "DOCUMENT_OVERVIEW");
@@ -626,7 +659,8 @@ public class RagService {
 
     public SearchResultDto searchSimilarChunks(SearchRequestDto request) {
 
-        List<UUID> docIds = request.getDocumentId() != null ? List.of(request.getDocumentId()) : Collections.emptyList();
+        List<UUID> docIds = request.getDocumentId() != null ? List.of(request.getDocumentId())
+                : Collections.emptyList();
         java.util.List<Document> matchedDocs = retrieveRelevantDocuments(request.getQuery(), docIds,
                 request.getTopK(), request.getSimilaritySearch());
 
@@ -647,15 +681,15 @@ public class RagService {
             @NotBlank(message = "Query cannot be empty") String query,
             List<UUID> documentIds,
             Integer topK,
-            Double similaritySearch
-    ) {
+            Double similaritySearch) {
         int effectiveTopK = (topK != null && topK > 0) ? topK : appProperties.getRag().getTopK();
         double effectiveSimilarity = (similaritySearch != null) ? similaritySearch
                 : appProperties.getRag().getSimilarityThreshold();
 
         final List<UUID> scopedDocIds = documentIds != null ? documentIds : Collections.emptyList();
 
-        // If the user scoped document(s) and requested a summary/overview/comparison, load chunks directly
+        // If the user scoped document(s) and requested a summary/overview/comparison,
+        // load chunks directly
         if (!scopedDocIds.isEmpty() && isSummaryIntent(query)) {
             List<Document> overviewDocs = getDocumentOverviewChunks(scopedDocIds, effectiveTopK);
             if (!overviewDocs.isEmpty()) {
@@ -678,7 +712,8 @@ public class RagService {
                 if (!scopedDocIds.isEmpty()) {
                     FilterExpressionBuilder b = new FilterExpressionBuilder();
                     if (scopedDocIds.size() == 1) {
-                        searchRequestBuilder.filterExpression(b.eq("documentId", scopedDocIds.get(0).toString()).build());
+                        searchRequestBuilder
+                                .filterExpression(b.eq("documentId", scopedDocIds.get(0).toString()).build());
                     } else {
                         String[] idStrings = scopedDocIds.stream().map(UUID::toString).toArray(String[]::new);
                         searchRequestBuilder.filterExpression(b.in("documentId", (Object[]) idStrings).build());
@@ -686,7 +721,8 @@ public class RagService {
                 }
 
                 List<Document> docs = vectorStore.similaritySearch(searchRequestBuilder.build());
-                log.info("Vector search retrieved {} chunks for query: '{}' across {} scoped doc(s)", docs.size(), query, scopedDocIds.size());
+                log.info("Vector search retrieved {} chunks for query: '{}' across {} scoped doc(s)", docs.size(),
+                        query, scopedDocIds.size());
                 return docs;
             } catch (Exception e) {
                 log.error("Vector similarity search error for query: '{}'", query, e);
@@ -729,8 +765,7 @@ public class RagService {
             "the", "and", "for", "that", "this", "these", "those", "with", "from",
             "about", "tell", "give", "explain", "describe", "show", "find", "know",
             "you", "your", "yours", "me", "my", "mine", "he", "his", "she", "her", "they", "their", "it", "its",
-            "ji", "sir", "madam", "mr", "mrs", "ms", "dr", "please", "thanks", "hello", "hi", "some", "any", "all"
-    );
+            "ji", "sir", "madam", "mr", "mrs", "ms", "dr", "please", "thanks", "hello", "hi", "some", "any", "all");
 
     /**
      * Fast PostgreSQL Keyword Search for exact terms, product codes, or acronyms
@@ -756,7 +791,8 @@ public class RagService {
         StringBuilder sql = new StringBuilder("SELECT id, content, metadata FROM vector_store WHERE (");
         List<Object> params = new ArrayList<>();
         for (int i = 0; i < terms.size(); i++) {
-            if (i > 0) sql.append(" OR ");
+            if (i > 0)
+                sql.append(" OR ");
             sql.append("content ILIKE ?");
             params.add("%" + terms.get(i) + "%");
         }
@@ -765,7 +801,8 @@ public class RagService {
         if (documentIds != null && !documentIds.isEmpty()) {
             sql.append(" AND (metadata->>'documentId' IN (");
             for (int i = 0; i < documentIds.size(); i++) {
-                if (i > 0) sql.append(", ");
+                if (i > 0)
+                    sql.append(", ");
                 sql.append("?");
                 params.add(documentIds.get(i).toString());
             }
@@ -782,12 +819,15 @@ public class RagService {
             Map<String, Object> metadata = new HashMap<>();
             if (metaJson != null && !metaJson.isBlank()) {
                 try {
-                    metadata = objectMapper.readValue(metaJson, new TypeReference<Map<String, Object>>() {});
-                } catch (Exception ignore) {}
+                    metadata = objectMapper.readValue(metaJson, new TypeReference<Map<String, Object>>() {
+                    });
+                } catch (Exception ignore) {
+                }
             }
 
             // Calculate term match ratio
-            long matchedCount = terms.stream().filter(t -> content != null && content.toLowerCase().contains(t)).count();
+            long matchedCount = terms.stream().filter(t -> content != null && content.toLowerCase().contains(t))
+                    .count();
             if (matchedCount > 0) {
                 double matchRatio = (double) matchedCount / terms.size();
                 double computedScore = Math.min(0.95, 0.50 + (matchRatio * 0.40));
@@ -802,12 +842,14 @@ public class RagService {
     }
 
     private boolean isStopword(String word) {
-        if (word == null || word.length() < 3) return true;
+        if (word == null || word.length() < 3)
+            return true;
         return STOPWORDS.contains(word.toLowerCase());
     }
 
     /**
-     * Reciprocal Rank Fusion (RRF) for merging and deduplicating semantic and keyword matches
+     * Reciprocal Rank Fusion (RRF) for merging and deduplicating semantic and
+     * keyword matches
      */
     private List<Document> fuseAndRerankResults(List<Document> vectorDocs, List<Document> keywordDocs, int topK) {
         Map<String, Document> docByContent = new LinkedHashMap<>();
@@ -837,7 +879,8 @@ public class RagService {
     }
 
     private String normalizeContent(String text) {
-        if (text == null) return "";
+        if (text == null)
+            return "";
         return text.trim().replaceAll("\\s+", " ").toLowerCase();
     }
 
