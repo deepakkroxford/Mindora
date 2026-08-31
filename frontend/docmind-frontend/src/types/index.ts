@@ -61,6 +61,13 @@ export interface ChatResponseDto {
   completionTokens?: number | null;
   totalTokens?: number | null;
   isCached?: boolean;
+  suggestedQuestions?: string[];
+}
+
+export interface FollowUpSuggestionRequestDto {
+  question: string;
+  answer: string;
+  documentIds?: string[];
 }
 
 export interface SearchRequestDto {
@@ -143,6 +150,7 @@ export interface Message {
   completionTokens?: number | null;
   totalTokens?: number | null;
   isCached?: boolean;
+  suggestedQuestions?: string[];
   timestamp: Date;
   isStreaming?: boolean;
 }

@@ -152,6 +152,20 @@ export const chatApi = {
     const { data } = await api.patch<ApiResponse<ConversationDto>>(`/chat/conversations/${conversationId}`, { title });
     return data;
   },
+
+  getFollowUpSuggestions: async (question: string, answer: string, documentIds?: string[]): Promise<ApiResponse<string[]>> => {
+    const { data } = await api.post<ApiResponse<string[]>>('/chat/suggestions/follow-up', {
+      question,
+      answer,
+      documentIds
+    });
+    return data;
+  },
+
+  getDocumentStarterPrompts: async (documentId: string): Promise<ApiResponse<string[]>> => {
+    const { data } = await api.get<ApiResponse<string[]>>(`/chat/suggestions/document/${documentId}`);
+    return data;
+  },
 };
 
 export default api;

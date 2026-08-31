@@ -252,6 +252,7 @@ interface MessageBubbleProps {
   onRegenerate?: (msg: Message) => void;
   onEditPrompt?: (text: string) => void;
   onInspectCitation?: (citation: CitationDto, index: number) => void;
+  onSelectPrompt?: (prompt: string) => void;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -260,6 +261,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onRegenerate,
   onEditPrompt,
   onInspectCitation,
+  onSelectPrompt,
 }) => {
   const isUser = message.role === 'user';
   const isWelcome = message.id === 'mindora-welcome-message';
@@ -510,6 +512,28 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             )}
           </div>
         )}
+
+        {/* Contextual Follow-Up Suggestions */}
+        {!message.isStreaming && message.suggestedQuestions && message.suggestedQuestions.length > 0 && (
+          <div className="mt-3.5 pl-1 flex flex-col gap-2 animate-fade-in">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-teal-400/90 tracking-wide uppercase">
+              <Sparkles className="w-3 h-3 text-teal-400 animate-pulse" />
+              <span>Suggested Follow-ups</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {message.suggestedQuestions.map((q, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => onSelectPrompt?.(q)}
+                  className="text-left text-xs bg-slate-900/90 hover:bg-teal-950/50 text-slate-300 hover:text-teal-200 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-teal-500/40 transition-all duration-150 flex items-center gap-2 group shadow-sm hover:shadow-teal-500/10"
+                >
+                  <span className="text-teal-400 text-xs group-hover:translate-x-0.5 transition-transform">✨</span>
+                  <span className="line-clamp-1">{q}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -559,12 +583,37 @@ const ChatView: React.FC = () => {
   const [showDocScopeMenu, setShowDocScopeMenu] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [inspectingCitation, setInspectingCitation] = useState<{ citation: CitationDto; index: number } | null>(null);
+  const [starterPrompts, setStarterPrompts] = useState<string[]>([]);
+  const [isLoadingStarterPrompts, setIsLoadingStarterPrompts] = useState(false);
   const recognitionRef = useRef<any>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const selectedDoc = documents.find((d) => d.id === selectedDocumentId);
+
+  // Fetch document starter prompt questions dynamically when a document is selected
+  useEffect(() => {
+    if (selectedDocumentId) {
+      setIsLoadingStarterPrompts(true);
+      chatApi.getDocumentStarterPrompts(selectedDocumentId)
+        .then((res) => {
+          if (res.data && res.data.length > 0) {
+            setStarterPrompts(res.data);
+          } else {
+            setStarterPrompts([]);
+          }
+        })
+        .catch(() => {
+          setStarterPrompts([]);
+        })
+        .finally(() => {
+          setIsLoadingStarterPrompts(false);
+        });
+    } else {
+      setStarterPrompts([]);
+    }
+  }, [selectedDocumentId]);
 
   const toggleListening = () => {
     if (typeof window === 'undefined') return;
@@ -745,6 +794,21 @@ const ChatView: React.FC = () => {
         prev.map((m) => m.id === msgId ? { ...m, isStreaming: false } : m)
       );
 
+      // Fetch contextual follow-up suggestions in background
+      chatApi.getFollowUpSuggestions(
+        question,
+        accumulated,
+        selectedDocumentIds.length > 0 ? selectedDocumentIds : (selectedDocumentId ? [selectedDocumentId] : undefined)
+      ).then((sugRes) => {
+        if (sugRes.data && sugRes.data.length > 0) {
+          setMessages((prev) =>
+            prev.map((m) => m.id === msgId ? { ...m, suggestedQuestions: sugRes.data } : m)
+          );
+        }
+      }).catch((err) => {
+        console.debug('Could not load follow-up suggestions', err);
+      });
+
       // Refresh conversation list and maintain conversationId for conversational memory
       try {
         const convList = await fetchConversations();
@@ -789,10 +853,11 @@ const ChatView: React.FC = () => {
         conversationId,
         bypassCache,
       });
+      const assistantMsgId = crypto.randomUUID();
       setMessages((prev) => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: assistantMsgId,
           role: 'assistant',
           content: res.data.answer,
           citations: res.data.citations,
@@ -802,11 +867,27 @@ const ChatView: React.FC = () => {
           completionTokens: res.data.completionTokens,
           totalTokens: res.data.totalTokens,
           isCached: res.data.isCached,
+          suggestedQuestions: res.data.suggestedQuestions,
           timestamp: new Date(),
         },
       ]);
       if (res.data.conversationId) setConversationId(res.data.conversationId);
       fetchConversations();
+
+      // If suggested questions not already in response, fetch them
+      if (!res.data.suggestedQuestions || res.data.suggestedQuestions.length === 0) {
+        chatApi.getFollowUpSuggestions(
+          question,
+          res.data.answer,
+          selectedDocumentIds.length > 0 ? selectedDocumentIds : (selectedDocumentId ? [selectedDocumentId] : undefined)
+        ).then((sugRes) => {
+          if (sugRes.data && sugRes.data.length > 0) {
+            setMessages((prev) =>
+              prev.map((m) => m.id === assistantMsgId ? { ...m, suggestedQuestions: sugRes.data } : m)
+            );
+          }
+        }).catch(() => {});
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
       toast.error(msg);
@@ -1019,6 +1100,57 @@ const ChatView: React.FC = () => {
               </div>
             </div>
 
+            {/* Dynamic AI Starter Questions for Selected Document */}
+            {selectedDoc && (
+              <div className="mb-5 p-4 rounded-2xl bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-transparent border border-teal-500/30 animate-fade-in text-left">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-teal-300 uppercase tracking-wider">
+                    <Sparkles className="w-4 h-4 text-teal-400 animate-pulse" />
+                    <span>AI Suggested Starter Prompts for "{selectedDoc.filename}"</span>
+                  </div>
+                  {isLoadingStarterPrompts && (
+                    <span className="flex items-center gap-1.5 text-[10px] text-teal-400">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Analyzing document...
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {starterPrompts.length > 0 ? (
+                    starterPrompts.map((prompt, pIdx) => (
+                      <button
+                        key={pIdx}
+                        onClick={() => sendMessage(prompt)}
+                        className="text-left p-3 rounded-xl bg-slate-900/80 hover:bg-teal-950/50 border border-slate-800 hover:border-teal-500/40 text-xs text-slate-300 hover:text-white transition-all group shadow-sm hover:shadow-teal-500/10"
+                      >
+                        <div className="flex items-center gap-1.5 text-teal-400 font-medium mb-1 text-[11px]">
+                          <span>✨ Question {pIdx + 1}</span>
+                        </div>
+                        <p className="text-slate-300 group-hover:text-teal-200 line-clamp-2 leading-relaxed text-[11px] font-medium">{prompt}</p>
+                      </button>
+                    ))
+                  ) : (
+                    [
+                      `Summarize the main purpose and key conclusions of ${selectedDoc.filename}.`,
+                      `What are the most important rules, dates, or numbers mentioned?`,
+                      `Extract all action items or notable findings from this document.`,
+                    ].map((p, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => sendMessage(p)}
+                        className="text-left p-3 rounded-xl bg-slate-900/60 hover:bg-teal-950/40 border border-slate-800 hover:border-teal-500/30 text-xs text-slate-300 hover:text-white transition-all group"
+                      >
+                        <div className="flex items-center gap-1.5 text-teal-400 font-medium mb-1 text-[11px]">
+                          <span>✨ Starter {idx + 1}</span>
+                        </div>
+                        <p className="text-slate-300 group-hover:text-teal-200 line-clamp-2 leading-relaxed text-[11px]">{p}</p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Prompt Template Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
               {PROMPT_TEMPLATES.map((cat) => (
@@ -1061,6 +1193,7 @@ const ChatView: React.FC = () => {
               onRegenerate={handleRegenerate}
               onEditPrompt={handleEditPrompt}
               onInspectCitation={(citation, idx) => setInspectingCitation({ citation, index: idx })}
+              onSelectPrompt={(prompt) => sendMessage(prompt)}
             />
           ))}
 
