@@ -54,6 +54,18 @@ spring:
 
 
 
+  # Redis configurations
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+
 #app configurations
 app:
   rag:
@@ -61,6 +73,14 @@ app:
 #    chunk-overlap: 100
     top-k: 5
     similarity-threshold: 0.0
+  cache:
+    enabled: true
+    query-ttl-seconds: 7200
+    document-ttl-seconds: 1800
+  rate-limit:
+    enabled: true
+    chat-per-minute: 2
+    upload-per-minute: 10
 
   cors:
     allowed-origins: "*"

@@ -16,7 +16,28 @@ public class AppProperties {
 
     private RagProperties rag = new RagProperties();
     private CorsProperties cors = new CorsProperties();
+    private CacheProperties cache = new CacheProperties();
+    private RateLimitProperties rateLimit = new RateLimitProperties();
 
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class CacheProperties {
+        private boolean enabled = true;
+        private long queryTtlSeconds = 7200;
+        private long documentTtlSeconds = 1800;
+    }
+
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class RateLimitProperties {
+        private boolean enabled = true;
+        private int chatPerMinute = 30;
+        private int uploadPerMinute = 10;
+    }
 
     @Getter
     @Setter
@@ -34,10 +55,10 @@ public class AppProperties {
     @NoArgsConstructor
     public static class RagProperties {
         private int chunkSize = 600;
-        private  int minChunkSizeChars=350;
-        private  int minChunkLengthToEmbed=5;
-        private  int maxNumChunks=10000;
-//        private int chunkOverlap = 100;
+        private int minChunkSizeChars = 350;
+        private int minChunkLengthToEmbed = 5;
+        private int maxNumChunks = 10000;
+//      private int chunkOverlap = 100;
         private int topK = 5;
         private double similarityThreshold = 0.0;
     }

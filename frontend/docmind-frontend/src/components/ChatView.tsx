@@ -367,6 +367,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           {!message.isStreaming && message.content && (
             <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-800/60 text-[11px] text-slate-500 flex-wrap">
               <div className="flex items-center gap-1.5 flex-wrap">
+                {/* Redis Semantic Cache Badge */}
+                {message.isCached && (
+                  <span
+                    className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono shadow-sm"
+                    title="Served instantly from Redis Semantic Cache (<15ms, $0 LLM token cost)"
+                  >
+                    <Zap className="w-2.5 h-2.5 text-amber-400 fill-amber-400 animate-pulse" />
+                    <span>⚡ Cached</span>
+                  </span>
+                )}
+
                 {/* Latency */}
                 {message.responseTimeMs != null && (
                   <span className="inline-flex items-center gap-1 text-[10px] text-teal-400 bg-teal-500/10 border border-teal-500/20 px-1.5 py-0.5 rounded font-mono">
@@ -662,7 +673,7 @@ const ChatView: React.FC = () => {
   }, [messages, isLoading]);
 
   /* ── Stream handler ── */
-  const sendStreaming = useCallback(async (question: string) => {
+  const sendStreaming = useCallback(async (question: string, bypassCache: boolean = false) => {
     const msgId = crypto.randomUUID();
     setMessages((prev) => [
       ...prev,
@@ -679,7 +690,7 @@ const ChatView: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Accept: 'text/plain',
+          Accept: 'text/plain, application/json, */*',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
@@ -688,11 +699,31 @@ const ChatView: React.FC = () => {
           documentIds: selectedDocumentIds.length > 0 ? selectedDocumentIds : undefined,
           topK: 5,
           conversationId,
+          bypassCache,
         }),
         signal: controller.signal,
       });
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        if (response.status === 429) {
+          let rateLimitMsg = "⏳ Slow down! You're asking questions too quickly. Please wait a minute and try again.";
+          try {
+            const errJson = await response.json();
+            if (errJson.message) rateLimitMsg = errJson.message;
+          } catch {
+            // keep friendly default
+          }
+          throw new Error(rateLimitMsg);
+        }
+        let errorMsg = `Server error (${response.status})`;
+        try {
+          const errJson = await response.json();
+          if (errJson.message) errorMsg = errJson.message;
+        } catch {
+          // ignore
+        }
+        throw new Error(errorMsg);
+      }
       if (!response.body) throw new Error('No response body');
 
       const reader = response.body.getReader();
@@ -735,7 +766,7 @@ const ChatView: React.FC = () => {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === msgId
-              ? { ...m, content: m.content || `❌ ${msg}`, isStreaming: false }
+              ? { ...m, content: m.content || (msg.startsWith('⏳') ? msg : `❌ ${msg}`), isStreaming: false }
               : m
           )
         );
@@ -747,7 +778,7 @@ const ChatView: React.FC = () => {
   }, [selectedDocumentId, selectedDocumentIds, conversationId, fetchConversations]);
 
   /* ── Normal query handler ── */
-  const sendNormal = useCallback(async (question: string) => {
+  const sendNormal = useCallback(async (question: string, bypassCache: boolean = false) => {
     setIsLoading(true);
     try {
       const res = await chatApi.query({
@@ -756,6 +787,7 @@ const ChatView: React.FC = () => {
         documentIds: selectedDocumentIds.length > 0 ? selectedDocumentIds : undefined,
         topK: 5,
         conversationId,
+        bypassCache,
       });
       setMessages((prev) => [
         ...prev,
@@ -769,22 +801,23 @@ const ChatView: React.FC = () => {
           promptTokens: res.data.promptTokens,
           completionTokens: res.data.completionTokens,
           totalTokens: res.data.totalTokens,
+          isCached: res.data.isCached,
           timestamp: new Date(),
         },
       ]);
       if (res.data.conversationId) setConversationId(res.data.conversationId);
       fetchConversations();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Something went wrong';
+      const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
       toast.error(msg);
       setMessages((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), role: 'assistant', content: `❌ ${msg}`, timestamp: new Date() },
+        { id: crypto.randomUUID(), role: 'assistant', content: msg.startsWith('⏳') ? msg : `❌ ${msg}`, timestamp: new Date() },
       ]);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedDocumentId, conversationId, fetchConversations]);
+  }, [selectedDocumentId, selectedDocumentIds, conversationId, fetchConversations]);
 
   /* ── Send dispatcher ── */
   const sendMessage = useCallback(async (question: string) => {
@@ -825,11 +858,12 @@ const ChatView: React.FC = () => {
 
     // Remove the message to regenerate
     setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+    toast.success('Regenerating fresh response from AI...');
 
     if (streamingMode) {
-      await sendStreaming(previousQuestion);
+      await sendStreaming(previousQuestion, true);
     } else {
-      await sendNormal(previousQuestion);
+      await sendNormal(previousQuestion, true);
     }
   }, [isLoading, isStreaming, messages, streamingMode, sendStreaming, sendNormal]);
 

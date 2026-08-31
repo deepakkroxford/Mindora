@@ -31,8 +31,13 @@ Mindora is a production-grade Document Intelligence and Question-Answering syste
 * Verified citations showing page numbers, chunk indices, and similarity match percentages.
 * 1-click modal inspector displaying full extracted passage snippets and raw JSON vector embedding metadata.
 
-### 7. 📊 Live Token Analytics & Latency Telemetry
-* Visual breakdown of prompt vs completion tokens, response latency (TTFT), and similarity score distributions.
+### 7. ⚡ Redis Semantic Caching & Distributed Rate Limiter
+* **Sub-15ms Latency & $0 Cost**: Identical or scoped queries hit Redis cache and return instantaneously with 0 LLM token cost.
+* **Targeted Invalidation**: Deleting or re-indexing documents automatically clears associated cached queries.
+* **Distributed Token Bucket**: Enforces cluster-wide rate limits (30 chat queries/min, 10 uploads/min) across load-balanced instances.
+
+### 8. 📊 Live Token Analytics & Latency Telemetry
+* Visual breakdown of prompt vs completion tokens, response latency (TTFT), similarity score distributions, and `⚡ Cached` telemetry indicators.
 
 ---
 
@@ -42,6 +47,7 @@ Mindora is a production-grade Document Intelligence and Question-Answering syste
 | :--- | :--- |
 | **Backend** | Java 21, Spring Boot 3.4.3, Spring AI 1.0.0-M6, Spring Security, JWT (JJWT) |
 | **Database & Vector Store** | PostgreSQL 16, `pgvector` extension, Hibernate / JPA, JDBC Template |
+| **Caching & Rate Limiting** | Redis 7, Spring Data Redis, Lettuce Pool, `@Cacheable`, Token Bucket |
 | **Document Processing** | Apache Tika, Spring AI Token/Text Splitters |
 | **AI Models** | OpenAI `gpt-4o` / `gpt-4o-mini`, `text-embedding-3-small` (1536 dims) |
 | **Frontend** | React 19, TypeScript, Vite, Tailwind CSS, Lucide Icons, Web Speech API |
@@ -53,9 +59,9 @@ Mindora is a production-grade Document Intelligence and Question-Answering syste
 ### 1. Prerequisites
 * **Java 21**
 * **Node.js 18+**
-* **Docker & Docker Compose** (for PostgreSQL + pgvector)
+* **Docker & Docker Compose** (for PostgreSQL + pgvector + Redis)
 
-### 2. Start PostgreSQL with pgvector
+### 2. Start PostgreSQL & Redis Services
 ```bash
 docker-compose up -d
 ```

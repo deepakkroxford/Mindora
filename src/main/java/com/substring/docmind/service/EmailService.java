@@ -1,29 +1,35 @@
 package com.substring.docmind.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class EmailService {
 
     private final JavaMailSender mailSender;
 
+    public EmailService(JavaMailSender mailSender) {
+        this.mailSender = mailSender;
+    }
+
     /**
-     * Send a 6-digit OTP to the specified email address
+     * Send a 6-digit OTP to the specified email address asynchronously in a background thread.
+     * The HTTP request thread will not be blocked while waiting for SMTP delivery.
      */
+    @Async("emailTaskExecutor")
     public void sendOtpEmail(String toEmail, String otp) {
-        log.info("Attempting to send OTP email to: {}", toEmail);
+        log.info("[Async Thread: {}] Attempting to send OTP email to: {}", Thread.currentThread().getName(), toEmail);
         
         // Output OTP to console regardless so the user is never blocked in dev mode
         System.out.println("\n==================================================");
         System.out.println("   [MINDORA PASSWORD RESET OTP]   ");
-        System.out.println("   Email: " + toEmail);
-        System.out.println("   OTP Code: " + otp);
+        System.out.println("   Thread: " + Thread.currentThread().getName());
+        System.out.println("   Email:  " + toEmail);
+        System.out.println("   OTP:    " + otp);
         System.out.println("==================================================\n");
 
         try {
@@ -39,7 +45,7 @@ public class EmailService {
                     + "The Mindora Team");
             
             mailSender.send(message);
-            log.info("OTP email successfully sent to: {}", toEmail);
+            log.info("[Async Thread: {}] OTP email successfully sent to: {}", Thread.currentThread().getName(), toEmail);
         } catch (Exception e) {
             log.error("Failed to send OTP email to {}. Error: {}", toEmail, e.getMessage());
             log.warn("SMTP Mail Sender might not be configured. Please retrieve the OTP from the console log above.");

@@ -32,13 +32,16 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Interceptor to handle 401 Unauthorized responses
+// Interceptor to handle 401 and 429 responses with user-friendly messages
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+    } else if (error.response?.status === 429) {
+      const serverMessage = error.response?.data?.message;
+      error.message = serverMessage || "⏳ Slow down! You're sending requests too quickly. Please wait a minute and try again.";
     }
     return Promise.reject(error);
   }
