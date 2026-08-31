@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.substring.docmind.config.AppProperties;
 import com.substring.docmind.dto.ChatResponseDto;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -20,15 +20,15 @@ import java.util.*;
 @Slf4j
 public class SemanticCacheService {
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
     private final AppProperties appProperties;
     private final ObjectMapper objectMapper;
 
     public SemanticCacheService(
-            RedisTemplate<String, Object> redisTemplate,
+            StringRedisTemplate stringRedisTemplate,
             AppProperties appProperties,
             ObjectMapper objectMapper) {
-        this.redisTemplate = redisTemplate;
+        this.stringRedisTemplate = stringRedisTemplate;
         this.appProperties = appProperties;
         this.objectMapper = objectMapper;
     }
@@ -48,16 +48,10 @@ public class SemanticCacheService {
         try {
             long startTime = System.currentTimeMillis();
             String key = buildCacheKey(question, documentIds);
-            Object cachedObj = redisTemplate.opsForValue().get(key);
+            String cachedJson = stringRedisTemplate.opsForValue().get(key);
 
-            if (cachedObj != null) {
-                ChatResponseDto response;
-                if (cachedObj instanceof ChatResponseDto dto) {
-                    response = dto;
-                } else {
-                    response = objectMapper.convertValue(cachedObj, ChatResponseDto.class);
-                }
-
+            if (cachedJson != null && !cachedJson.isBlank()) {
+                ChatResponseDto response = objectMapper.readValue(cachedJson, ChatResponseDto.class);
                 long lookupTime = System.currentTimeMillis() - startTime;
                 response.setIsCached(true);
                 response.setResponseTimeMs(lookupTime);
@@ -96,14 +90,15 @@ public class SemanticCacheService {
                     .isCached(true)
                     .build();
 
-            redisTemplate.opsForValue().set(key, copy, Duration.ofSeconds(ttlSeconds));
+            String jsonPayload = objectMapper.writeValueAsString(copy);
+            stringRedisTemplate.opsForValue().set(key, jsonPayload, Duration.ofSeconds(ttlSeconds));
 
             // Map document IDs to this cache key for targeted invalidation
             if (documentIds != null && !documentIds.isEmpty()) {
                 for (UUID docId : documentIds) {
                     String docKey = DOC_INDEX_PREFIX + docId.toString();
-                    redisTemplate.opsForSet().add(docKey, key);
-                    redisTemplate.expire(docKey, Duration.ofSeconds(ttlSeconds + 3600));
+                    stringRedisTemplate.opsForSet().add(docKey, key);
+                    stringRedisTemplate.expire(docKey, Duration.ofSeconds(ttlSeconds + 3600));
                 }
             }
 
@@ -122,11 +117,11 @@ public class SemanticCacheService {
             return;
         try {
             String docKey = DOC_INDEX_PREFIX + documentId.toString();
-            Set<Object> queryKeys = redisTemplate.opsForSet().members(docKey);
+            Set<String> queryKeys = stringRedisTemplate.opsForSet().members(docKey);
             if (queryKeys != null && !queryKeys.isEmpty()) {
-                List<String> keysToDelete = queryKeys.stream().map(Object::toString).toList();
-                redisTemplate.delete(keysToDelete);
-                redisTemplate.delete(docKey);
+                List<String> keysToDelete = new ArrayList<>(queryKeys);
+                stringRedisTemplate.delete(keysToDelete);
+                stringRedisTemplate.delete(docKey);
                 log.info("Evicted {} cached queries for documentId: {}", keysToDelete.size(), documentId);
             }
         } catch (Exception e) {
