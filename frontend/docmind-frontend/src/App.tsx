@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AppProvider, useApp } from './context/AppContext';
@@ -10,6 +10,7 @@ import ChatView from './components/ChatView';
 import SearchView from './components/SearchView';
 import ChunksView from './components/ChunksView';
 import GuideView from './components/GuideView';
+import StudyHubView from './components/StudyHubView';
 import UploadDialog from './components/UploadDialog';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -21,8 +22,13 @@ const ProtectedLayout: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
-  const { activeTab } = useApp();
+  const { activeTab, fetchDocuments, fetchConversations } = useApp();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+
+  useEffect(() => {
+    fetchDocuments();
+    fetchConversations();
+  }, [fetchDocuments, fetchConversations]);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#0b0f19] text-slate-100">
@@ -36,6 +42,7 @@ const ProtectedLayout: React.FC = () => {
           {activeTab === 'chat' && <ChatView />}
           {activeTab === 'search' && <SearchView />}
           {activeTab === 'chunks' && <ChunksView />}
+          {activeTab === 'study' && <StudyHubView />}
           {activeTab === 'guide' && <GuideView onUploadClick={() => setIsUploadOpen(true)} />}
         </main>
       </div>

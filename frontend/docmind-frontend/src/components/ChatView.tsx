@@ -5,7 +5,7 @@ import {
   AlertTriangle, ThumbsUp, ThumbsDown, MoreHorizontal, MessageSquare, Globe,
   HelpCircle, Lightbulb, Compass, FileCheck, BarChart3, Cpu, Target,
   Download, FileCode, Edit2, ShieldAlert, Mic, MicOff, Volume2, VolumeX,
-  ExternalLink,
+  ExternalLink, GraduationCap,
 } from 'lucide-react';
 import { chatApi } from '../services/api';
 import { useApp } from '../context/AppContext';
@@ -14,23 +14,6 @@ import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import ChatAnalyticsModal from './ChatAnalyticsModal';
 import CitationDetailModal from './CitationDetailModal';
-
-/* ─── Default Welcome Message from Mindora AI ──────────────────── */
-const WELCOME_MESSAGE: Message = {
-  id: 'mindora-welcome-message',
-  role: 'assistant',
-  content: `👋 **Hi! I am Mindora AI Assistant**, your intelligent RAG companion for document analysis and research.
-
-I can help you extract insights, analyze data, and query your knowledge base in real-time. Here is what you can do:
-
-- 📄 **Contextual Document Q&A**: Ask detailed questions about any uploaded PDF, Word, CSV, Markdown, or Text file with source citations.
-- ⚡ **Real-Time Streaming**: Receive rapid, token-by-token answers backed by pgvector embeddings.
-- 🔍 **Semantic Vector Search**: Locate exact clauses, metrics, and definitions across documents.
-- 🧩 **Vector Chunks Explorer**: Inspect document chunking and metadata properties.
-
-💡 *To get started, select or upload a document from the sidebar, pick a prompt template below, or type your question!*`,
-  timestamp: new Date(),
-};
 
 /* ─── Prompt templates ──────────────────────────────────────────── */
 const PROMPT_TEMPLATES = [
@@ -71,6 +54,144 @@ const PROMPT_TEMPLATES = [
     ],
   },
 ];
+
+import Prism from 'prismjs';
+import 'prismjs/components/prism-java';
+import 'prismjs/components/prism-yaml';
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-jsx';
+import 'prismjs/components/prism-tsx';
+import 'prismjs/components/prism-sql';
+import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-bash';
+import 'prismjs/components/prism-css';
+import 'prismjs/components/prism-markup';
+import 'prismjs/components/prism-docker';
+import 'prismjs/components/prism-properties';
+
+/* ─── Helper function to escape HTML ─── */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/* ─── Code Block Component with Real IDE Syntax Highlighting & 1-Click Copy ──── */
+const CodeBlock: React.FC<{ language?: string; code: string }> = ({ language, code }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      toast.success('Code copied to clipboard!');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy code');
+    }
+  };
+
+  const normalizedLang = useMemo(() => {
+    const l = (language || '').toLowerCase().trim();
+    if (l === 'js' || l === 'javascript') return 'javascript';
+    if (l === 'ts' || l === 'typescript') return 'typescript';
+    if (l === 'tsx' || l === 'jsx') return 'tsx';
+    if (l === 'java' || l === 'kotlin') return 'java';
+    if (l === 'py' || l === 'python') return 'python';
+    if (l === 'sql' || l === 'pgsql') return 'sql';
+    if (l === 'yaml' || l === 'yml') return 'yaml';
+    if (l === 'json') return 'json';
+    if (l === 'bash' || l === 'sh' || l === 'shell' || l === 'zsh') return 'bash';
+    if (l === 'html' || l === 'xml' || l === 'svg') return 'markup';
+    if (l === 'css' || l === 'scss') return 'css';
+    if (l === 'docker' || l === 'dockerfile') return 'docker';
+    if (l === 'properties' || l === 'env') return 'properties';
+    return l || 'text';
+  }, [language]);
+
+  const highlightedHtml = useMemo(() => {
+    try {
+      const grammar = Prism.languages[normalizedLang] || Prism.languages.java || Prism.languages.javascript || Prism.languages.clike;
+      if (grammar) {
+        return Prism.highlight(code, grammar, normalizedLang);
+      }
+      return escapeHtml(code);
+    } catch {
+      return escapeHtml(code);
+    }
+  }, [code, normalizedLang]);
+
+  const getLangBadgeStyle = (lang?: string) => {
+    const l = (lang || '').toLowerCase();
+    if (l === 'java' || l === 'kotlin') return 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+    if (l === 'python' || l === 'py') return 'text-sky-400 bg-sky-500/10 border-sky-500/30';
+    if (l === 'ts' || l === 'typescript' || l === 'js' || l === 'javascript' || l === 'tsx' || l === 'jsx')
+      return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30';
+    if (l === 'sql' || l === 'pgsql') return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
+    if (l === 'json' || l === 'yaml' || l === 'yml') return 'text-purple-400 bg-purple-500/10 border-purple-500/30';
+    if (l === 'bash' || l === 'sh' || l === 'shell' || l === 'zsh') return 'text-rose-400 bg-rose-500/10 border-rose-500/30';
+    if (l === 'html' || l === 'css') return 'text-orange-400 bg-orange-500/10 border-orange-500/30';
+    return 'text-teal-400 bg-teal-500/10 border-teal-500/30';
+  };
+
+  return (
+    <div className="my-4 rounded-2xl border border-slate-700/60 dark:border-slate-800 overflow-hidden bg-[#0d121f] dark:bg-[#070b14] shadow-2xl shadow-black/30 group/code">
+      {/* Code Header Bar */}
+      <div className="flex items-center justify-between px-4 py-2 bg-[#141b2d] dark:bg-slate-900/90 border-b border-slate-700/60 dark:border-slate-800/80 select-none">
+        <div className="flex items-center gap-2.5">
+          {/* macOS window traffic dots */}
+          <div className="flex items-center gap-1.5 mr-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500/90 inline-block shadow-sm" />
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/90 inline-block shadow-sm" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/90 inline-block shadow-sm" />
+          </div>
+
+          <span
+            className={clsx(
+              'px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider border',
+              getLangBadgeStyle(language)
+            )}
+          >
+            {language || 'code'}
+          </span>
+        </div>
+
+        <button
+          onClick={handleCopy}
+          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs !text-slate-200 hover:!text-white bg-slate-800/80 hover:bg-teal-600/30 border border-slate-700/70 hover:border-teal-500/50 transition-all duration-150 font-medium active:scale-95 shadow-sm"
+          title="Copy code to clipboard"
+        >
+          {copied ? (
+            <>
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-emerald-400 font-semibold">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy className="w-3.5 h-3.5 text-slate-400 group-hover/code:text-teal-300 transition-colors" />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Code Body with IDE Syntax Highlighting */}
+      <div className="relative">
+        <pre className="p-4 overflow-x-auto text-[13px] font-mono leading-relaxed selection:bg-teal-500/30 selection:text-white prism-code-block">
+          <code
+            className={`language-${normalizedLang}`}
+            dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+          />
+        </pre>
+      </div>
+    </div>
+  );
+};
 
 /* ─── Markdown renderer ─────────────────────────────────────────── */
 function renderMarkdown(content: string): React.ReactNode[] {
@@ -137,16 +258,7 @@ function renderMarkdown(content: string): React.ReactNode[] {
         i++;
       }
       nodes.push(
-        <div key={i} className="my-3 rounded-xl border border-slate-800 overflow-hidden bg-[#070b14]">
-          {lang && (
-            <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900/80 border-b border-slate-800 text-[10px] text-slate-400 font-mono uppercase tracking-wider">
-              <span>{lang}</span>
-            </div>
-          )}
-          <pre className="p-3.5 overflow-x-auto text-xs text-slate-200 font-mono leading-relaxed">
-            <code>{codeLines.join('\n')}</code>
-          </pre>
-        </div>
+        <CodeBlock key={`code-${i}`} language={lang} code={codeLines.join('\n')} />
       );
       i++;
       continue;
@@ -250,24 +362,31 @@ interface MessageBubbleProps {
   message: Message;
   isLastAssistant?: boolean;
   onRegenerate?: (msg: Message) => void;
-  onEditPrompt?: (text: string) => void;
   onInspectCitation?: (citation: CitationDto, index: number) => void;
   onSelectPrompt?: (prompt: string) => void;
+  onSaveEdit?: (msgId: string, newContent: string) => void;
+  userName?: string;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   isLastAssistant,
   onRegenerate,
-  onEditPrompt,
   onInspectCitation,
   onSelectPrompt,
+  onSaveEdit,
+  userName,
 }) => {
   const isUser = message.role === 'user';
-  const isWelcome = message.id === 'mindora-welcome-message';
   const [showCitations, setShowCitations] = useState(false);
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(message.content);
+
+  useEffect(() => {
+    setEditText(message.content);
+  }, [message.content]);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
@@ -316,28 +435,101 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   if (isUser) {
+    const displayName = userName ? userName.trim().split(' ')[0] : 'You';
+    const initial = displayName.charAt(0).toUpperCase();
+
     return (
-      <div className="flex items-center justify-end gap-1.5 animate-fade-in group">
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          {onEditPrompt && (
-            <button
-              onClick={() => onEditPrompt(message.content)}
-              className="p-1 text-slate-400 hover:text-teal-400 hover:bg-slate-800/80 rounded-lg transition-colors"
-              title="Edit and retry question"
-            >
-              <Edit2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-          <button
-            onClick={handleCopy}
-            className="p-1 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-lg transition-colors"
-            title="Copy question"
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-          </button>
+      <div className="flex flex-col items-end gap-1.5 animate-fade-in group max-w-[88%] sm:max-w-[78%] ml-auto w-full">
+        {/* User Identity Header with Avatar & Name */}
+        <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium mr-1 select-none">
+          <span>{displayName}</span>
+          <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-teal-500 to-cyan-400 text-slate-950 text-[10px] font-extrabold flex items-center justify-center shadow-sm shadow-teal-500/20 border border-teal-300/40">
+            {initial}
+          </div>
         </div>
-        <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-xs bg-gradient-to-r from-teal-600 to-teal-500 text-white px-4 py-3 shadow-md shadow-teal-600/15">
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+
+        <div className="flex items-center gap-1.5 w-full justify-end">
+          {/* Action buttons (Copy, Edit) visible on hover when not editing */}
+          {!isEditing && (
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={() => setIsEditing(true)}
+                className="p-1.5 text-slate-400 hover:text-teal-400 hover:bg-slate-800/80 rounded-lg transition-colors"
+                title="Edit question in-place"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleCopy}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-lg transition-colors"
+                title="Copy question"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          )}
+
+          {/* Inline Edit Box OR Normal Message Bubble */}
+          {isEditing ? (
+            <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-slate-900 border border-teal-500/40 p-3 shadow-xl dark:shadow-2xl shadow-black/5 dark:shadow-black/50 animate-fade-in">
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (editText.trim() && editText.trim() !== message.content) {
+                      onSaveEdit?.(message.id, editText.trim());
+                      setIsEditing(false);
+                    } else if (editText.trim() === message.content) {
+                      setIsEditing(false);
+                    }
+                  } else if (e.key === 'Escape') {
+                    setIsEditing(false);
+                    setEditText(message.content);
+                  }
+                }}
+                rows={Math.max(editText.split('\n').length, 2)}
+                className="w-full bg-slate-50 dark:bg-slate-950/90 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-xl p-3 border border-slate-200 dark:border-slate-700/80 focus:outline-none focus:border-teal-500 resize-none font-normal leading-relaxed shadow-inner"
+                autoFocus
+              />
+              <div className="flex items-center justify-between gap-2 mt-2.5 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <span className="text-[11px] text-slate-500 hidden sm:inline">
+                  <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded text-[10px]">Enter</kbd> to save • <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded text-[10px]">Esc</kbd> to cancel
+                </span>
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditText(message.content);
+                    }}
+                    className="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!editText.trim()}
+                    onClick={() => {
+                      if (editText.trim()) {
+                        onSaveEdit?.(message.id, editText.trim());
+                        setIsEditing(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold !text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-md shadow-teal-500/25 transition-all"
+                  >
+                    <span className="!text-white">Save & Submit</span>
+                    <Send className="w-3 h-3 !text-white" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl rounded-tr-xs bg-gradient-to-br from-teal-600 via-teal-500 to-emerald-600 text-white px-4.5 py-3 shadow-lg shadow-teal-600/15 border border-teal-400/20 transition-transform duration-150">
+              <p className="text-sm leading-relaxed whitespace-pre-wrap font-normal">{message.content}</p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -345,14 +537,20 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   return (
     <div className="flex items-start gap-3 max-w-[95%] sm:max-w-[90%] animate-fade-in group">
-      {/* Bot Avatar */}
-      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-md shadow-teal-500/20 flex-shrink-0 mt-1">
+      {/* Assistant Avatar */}
+      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 via-cyan-500 to-blue-600 flex items-center justify-center shadow-md shadow-teal-500/25 flex-shrink-0 mt-1 ring-2 ring-teal-500/20">
         <Bot className="w-4 h-4 text-white" />
       </div>
 
       <div className="flex-1 min-w-0">
+        {/* Assistant Name Label */}
+        <div className="flex items-center gap-1.5 mb-1.5 ml-1 select-none">
+          <span className="text-xs font-semibold text-slate-200">Mindora AI</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium">Assistant</span>
+        </div>
+
         {/* Message Container Card */}
-        <div className="glass-card rounded-2xl p-4 border border-slate-800/80 bg-slate-900/60 shadow-sm relative">
+        <div className="glass-card rounded-2xl p-4.5 border border-slate-800/80 bg-slate-900/70 shadow-sm relative backdrop-blur-md">
           <div className="prose">
             {message.content ? (
               renderMarkdown(message.content)
@@ -431,40 +629,36 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
               {/* Action Buttons: Feedback, Retry, Copy */}
               <div className="flex items-center gap-1 flex-shrink-0">
-                {!isWelcome && (
-                  <>
-                    <button
-                      onClick={() => handleFeedback('like')}
-                      className={clsx(
-                        'p-1 rounded transition-colors',
-                        feedback === 'like' ? 'text-teal-400 bg-teal-500/20' : 'text-slate-500 hover:text-teal-400 hover:bg-slate-800'
-                      )}
-                      title="Helpful response"
-                    >
-                      <ThumbsUp className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => handleFeedback('dislike')}
-                      className={clsx(
-                        'p-1 rounded transition-colors',
-                        feedback === 'dislike' ? 'text-rose-400 bg-rose-500/20' : 'text-slate-500 hover:text-rose-400 hover:bg-slate-800'
-                      )}
-                      title="Unhelpful response"
-                    >
-                      <ThumbsDown className="w-3 h-3" />
-                    </button>
+                <button
+                  onClick={() => handleFeedback('like')}
+                  className={clsx(
+                    'p-1 rounded transition-colors',
+                    feedback === 'like' ? 'text-teal-400 bg-teal-500/20' : 'text-slate-500 hover:text-teal-400 hover:bg-slate-800'
+                  )}
+                  title="Helpful response"
+                >
+                  <ThumbsUp className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => handleFeedback('dislike')}
+                  className={clsx(
+                    'p-1 rounded transition-colors',
+                    feedback === 'dislike' ? 'text-rose-400 bg-rose-500/20' : 'text-slate-500 hover:text-rose-400 hover:bg-slate-800'
+                  )}
+                  title="Unhelpful response"
+                >
+                  <ThumbsDown className="w-3 h-3" />
+                </button>
 
-                    {onRegenerate && (
-                      <button
-                        onClick={() => onRegenerate(message)}
-                        className="flex items-center gap-1 text-slate-400 hover:text-teal-400 p-1 hover:bg-slate-800 rounded transition-colors"
-                        title="Regenerate answer"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span className="hidden sm:inline">Regenerate</span>
-                      </button>
-                    )}
-                  </>
+                {onRegenerate && (
+                  <button
+                    onClick={() => onRegenerate(message)}
+                    className="flex items-center gap-1 text-slate-400 hover:text-teal-400 p-1 hover:bg-slate-800 rounded transition-colors"
+                    title="Regenerate answer"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span className="hidden sm:inline">Regenerate</span>
+                  </button>
                 )}
 
                 <button
@@ -569,15 +763,15 @@ const ChatView: React.FC = () => {
     setSelectedConversationId,
     fetchConversations,
     conversations,
+    setActiveTab,
   } = useApp();
 
-  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMode, setStreamingMode] = useState(true);
   const [conversationId, setConversationId] = useState<string | undefined>(selectedConversationId ?? undefined);
-  const [showTemplates, setShowTemplates] = useState(true);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showDocScopeMenu, setShowDocScopeMenu] = useState(false);
@@ -585,6 +779,16 @@ const ChatView: React.FC = () => {
   const [inspectingCitation, setInspectingCitation] = useState<{ citation: CitationDto; index: number } | null>(null);
   const [starterPrompts, setStarterPrompts] = useState<string[]>([]);
   const [isLoadingStarterPrompts, setIsLoadingStarterPrompts] = useState(false);
+
+  // Retrieve current logged-in user info for personal greetings & avatars
+  const currentUser = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
   const recognitionRef = useRef<any>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -678,7 +882,6 @@ const ChatView: React.FC = () => {
   useEffect(() => {
     if (selectedConversationId) {
       setConversationId(selectedConversationId);
-      setShowTemplates(false);
       chatApi
         .getMessages(selectedConversationId)
         .then((res) => {
@@ -711,9 +914,8 @@ const ChatView: React.FC = () => {
           console.error('Failed to load messages', err);
         });
     } else {
-      setMessages([WELCOME_MESSAGE]);
+      setMessages([]);
       setConversationId(undefined);
-      setShowTemplates(true);
     }
   }, [selectedConversationId]);
 
@@ -903,7 +1105,6 @@ const ChatView: React.FC = () => {
   /* ── Send dispatcher ── */
   const sendMessage = useCallback(async (question: string) => {
     if (!question.trim() || isLoading || isStreaming) return;
-    setShowTemplates(false);
 
     setMessages((prev) => [
       ...prev,
@@ -948,25 +1149,37 @@ const ChatView: React.FC = () => {
     }
   }, [isLoading, isStreaming, messages, streamingMode, sendStreaming, sendNormal]);
 
-  /* ── Edit prompt handler ── */
-  const handleEditPrompt = useCallback((promptText: string) => {
-    setInput(promptText);
-    if (inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.style.height = 'auto';
-      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 160)}px`;
+  /* ── Inline Edit question & resubmit handler ── */
+  const handleSaveEdit = useCallback(async (msgId: string, newQuestion: string) => {
+    if (!newQuestion.trim() || isLoading || isStreaming) return;
+
+    // Find the edited message index
+    const msgIndex = messages.findIndex((m) => m.id === msgId);
+    if (msgIndex === -1) return;
+
+    // Truncate messages after this question and update its content
+    const updated = messages.slice(0, msgIndex + 1).map((m) =>
+      m.id === msgId ? { ...m, content: newQuestion.trim(), timestamp: new Date() } : m
+    );
+    setMessages(updated);
+
+    toast('Regenerating response for edited question...', { icon: '✨' });
+
+    if (streamingMode) {
+      await sendStreaming(newQuestion.trim(), true);
+    } else {
+      await sendNormal(newQuestion.trim(), true);
     }
-  }, []);
+  }, [messages, isLoading, isStreaming, streamingMode, sendStreaming, sendNormal]);
 
   const stopStream = () => {
     abortRef.current?.abort();
   };
 
   const clearChat = () => {
-    setMessages([WELCOME_MESSAGE]);
+    setMessages([]);
     setConversationId(undefined);
     setSelectedConversationId(null);
-    setShowTemplates(true);
     setShowExportMenu(false);
     abortRef.current?.abort();
   };
@@ -1062,71 +1275,72 @@ const ChatView: React.FC = () => {
     <div className="flex flex-col h-full bg-[#0b0f19] relative overflow-hidden transition-colors">
       {/* ── Messages Container ── */}
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* Welcome / Hero State */}
-        {showTemplates && messages.length <= 1 && (
-          <div className="animate-fade-in max-w-3xl mx-auto py-6">
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-teal-500 to-cyan-500 shadow-xl shadow-teal-500/25 mb-4">
-                <Sparkles className="w-7 h-7 text-white" />
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2">
-                What can I analyze for you today?
-              </h2>
-              <p className="text-slate-400 text-sm max-w-md mx-auto leading-relaxed">
-                {selectedDoc
-                  ? `Active focus on "${selectedDoc.filename}". Ask questions or pick a prompt below.`
-                  : `Ask questions across all ${documents.length} uploaded documents in your workspace.`}
-              </p>
+        {/* Modern Minimalist Hero Landing State (Only shown when chat is empty) */}
+        {messages.length === 0 && (
+          <div className="animate-fade-in max-w-3xl mx-auto py-8 sm:py-12 flex flex-col items-center justify-center text-center">
+            {/* Animated Glowing Brand Badge */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-medium mb-4 shadow-lg shadow-teal-500/5 animate-pulse">
+              <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+              <span>Mindora AI • Document Intelligence & RAG</span>
+            </div>
 
-              {/* Scoped Context Chip */}
-              <div className="flex items-center justify-center gap-2 mt-4">
-                {selectedDoc ? (
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-xs text-teal-300">
-                    <FileText className="w-3.5 h-3.5 text-teal-400" />
-                    <span>Scoped to: <strong>{selectedDoc.filename}</strong></span>
-                    <button
-                      onClick={() => setSelectedDocumentId(null)}
-                      className="text-teal-400 hover:text-white ml-1 underline text-[10px]"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                ) : (
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
-                    <Globe className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Searching across <strong>all {documents.length} documents</strong></span>
-                  </div>
-                )}
-              </div>
+            <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white mb-2.5 bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+              {currentUser?.name ? `Hello, ${currentUser.name.split(' ')[0]}!` : 'How can I assist you today?'}
+            </h2>
+            <p className="text-slate-400 text-sm max-w-lg mx-auto leading-relaxed mb-6">
+              {selectedDoc
+                ? `Active focus on "${selectedDoc.filename}". Query key metrics, clauses, or summaries below.`
+                : `Ask questions across your uploaded knowledge base with instant vector citations.`}
+            </p>
+
+            {/* Scoped Context Chip */}
+            <div className="mb-8">
+              {selectedDoc ? (
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-xs text-teal-300 shadow-sm">
+                  <FileText className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Scoped to: <strong>{selectedDoc.filename}</strong></span>
+                  <button
+                    onClick={() => setSelectedDocumentId(null)}
+                    className="text-teal-400 hover:text-white ml-1.5 underline text-[10px] font-semibold"
+                  >
+                    Clear
+                  </button>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-xs text-slate-400 shadow-sm">
+                  <Globe className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Searching across <strong>all {documents.length} documents</strong> in workspace</span>
+                </div>
+              )}
             </div>
 
             {/* Dynamic AI Starter Questions for Selected Document */}
             {selectedDoc && (
-              <div className="mb-5 p-4 rounded-2xl bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-transparent border border-teal-500/30 animate-fade-in text-left">
-                <div className="flex items-center justify-between mb-3">
+              <div className="w-full mb-6 p-5 rounded-2xl bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-transparent border border-teal-500/30 animate-fade-in text-left">
+                <div className="flex items-center justify-between mb-3.5">
                   <div className="flex items-center gap-2 text-xs font-bold text-teal-300 uppercase tracking-wider">
                     <Sparkles className="w-4 h-4 text-teal-400 animate-pulse" />
-                    <span>AI Suggested Starter Prompts for "{selectedDoc.filename}"</span>
+                    <span>AI Suggested Starter Questions for "{selectedDoc.filename}"</span>
                   </div>
                   {isLoadingStarterPrompts && (
-                    <span className="flex items-center gap-1.5 text-[10px] text-teal-400">
-                      <Loader2 className="w-3 h-3 animate-spin" />
+                    <span className="flex items-center gap-1.5 text-[11px] text-teal-400 font-medium">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       Analyzing document...
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {starterPrompts.length > 0 ? (
                     starterPrompts.map((prompt, pIdx) => (
                       <button
                         key={pIdx}
                         onClick={() => sendMessage(prompt)}
-                        className="text-left p-3 rounded-xl bg-slate-900/80 hover:bg-teal-950/50 border border-slate-800 hover:border-teal-500/40 text-xs text-slate-300 hover:text-white transition-all group shadow-sm hover:shadow-teal-500/10"
+                        className="text-left p-3.5 rounded-xl bg-slate-900/85 hover:bg-teal-950/50 border border-slate-800/80 hover:border-teal-500/50 text-xs text-slate-300 hover:text-white transition-all duration-200 group shadow-md hover:shadow-teal-500/10 hover:-translate-y-0.5"
                       >
-                        <div className="flex items-center gap-1.5 text-teal-400 font-medium mb-1 text-[11px]">
-                          <span>✨ Question {pIdx + 1}</span>
+                        <div className="flex items-center gap-1.5 text-teal-400 font-medium mb-1.5 text-[11px]">
+                          <span>✨ Starter {pIdx + 1}</span>
                         </div>
-                        <p className="text-slate-300 group-hover:text-teal-200 line-clamp-2 leading-relaxed text-[11px] font-medium">{prompt}</p>
+                        <p className="text-slate-300 group-hover:text-teal-200 line-clamp-2 leading-relaxed text-xs font-medium">{prompt}</p>
                       </button>
                     ))
                   ) : (
@@ -1138,12 +1352,12 @@ const ChatView: React.FC = () => {
                       <button
                         key={idx}
                         onClick={() => sendMessage(p)}
-                        className="text-left p-3 rounded-xl bg-slate-900/60 hover:bg-teal-950/40 border border-slate-800 hover:border-teal-500/30 text-xs text-slate-300 hover:text-white transition-all group"
+                        className="text-left p-3.5 rounded-xl bg-slate-900/70 hover:bg-teal-950/40 border border-slate-800 hover:border-teal-500/40 text-xs text-slate-300 hover:text-white transition-all duration-200 group hover:-translate-y-0.5"
                       >
-                        <div className="flex items-center gap-1.5 text-teal-400 font-medium mb-1 text-[11px]">
+                        <div className="flex items-center gap-1.5 text-teal-400 font-medium mb-1.5 text-[11px]">
                           <span>✨ Starter {idx + 1}</span>
                         </div>
-                        <p className="text-slate-300 group-hover:text-teal-200 line-clamp-2 leading-relaxed text-[11px]">{p}</p>
+                        <p className="text-slate-300 group-hover:text-teal-200 line-clamp-2 leading-relaxed text-xs">{p}</p>
                       </button>
                     ))
                   )}
@@ -1151,13 +1365,13 @@ const ChatView: React.FC = () => {
               </div>
             )}
 
-            {/* Prompt Template Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+            {/* Prompt Template Cards */}
+            <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-3.5 text-left">
               {PROMPT_TEMPLATES.map((cat) => (
                 <div
                   key={cat.category}
                   className={clsx(
-                    'rounded-2xl border bg-slate-900/40 p-4 transition-all duration-200',
+                    'rounded-2xl border bg-slate-900/50 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg',
                     cat.border
                   )}
                 >
@@ -1170,10 +1384,10 @@ const ChatView: React.FC = () => {
                       <button
                         key={t.label}
                         onClick={() => sendMessage(t.prompt)}
-                        className="w-full text-left p-2.5 rounded-xl bg-slate-800/50 hover:bg-teal-500/10 border border-slate-800 hover:border-teal-500/30 transition-all text-xs text-slate-300 hover:text-white group"
+                        className="w-full text-left p-2.5 rounded-xl bg-slate-800/40 hover:bg-teal-500/10 border border-slate-800/80 hover:border-teal-500/40 transition-all text-xs text-slate-300 hover:text-white group"
                       >
                         <span className="font-medium block text-slate-200 group-hover:text-teal-300 transition-colors mb-0.5">{t.label}</span>
-                        <span className="text-slate-500 text-[10px] line-clamp-1 group-hover:text-slate-400">{t.prompt}</span>
+                        <span className="text-slate-500 text-[11px] line-clamp-1 group-hover:text-slate-400">{t.prompt}</span>
                       </button>
                     ))}
                   </div>
@@ -1191,9 +1405,10 @@ const ChatView: React.FC = () => {
               message={msg}
               isLastAssistant={msg.role === 'assistant' && index === messages.length - 1}
               onRegenerate={handleRegenerate}
-              onEditPrompt={handleEditPrompt}
+              onSaveEdit={handleSaveEdit}
               onInspectCitation={(citation, idx) => setInspectingCitation({ citation, index: idx })}
               onSelectPrompt={(prompt) => sendMessage(prompt)}
+              userName={currentUser?.name}
             />
           ))}
 
@@ -1216,75 +1431,109 @@ const ChatView: React.FC = () => {
                     type="button"
                     onClick={() => setShowDocScopeMenu(!showDocScopeMenu)}
                     className={clsx(
-                      'inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md transition-all border font-medium',
+                      'inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg transition-all border font-medium',
                       selectedDocumentIds.length > 0
-                        ? 'text-teal-300 bg-teal-500/10 border-teal-500/30 hover:bg-teal-500/20'
-                        : 'text-slate-400 bg-slate-800/80 border-slate-700/80 hover:text-slate-200'
+                        ? 'text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-500/10 border-teal-300 dark:border-teal-500/30 hover:bg-teal-100'
+                        : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 border-slate-300 dark:border-slate-700/80 hover:text-slate-900 dark:hover:text-slate-200'
                     )}
                     title="Click to scope specific documents for comparison or focused Q&A"
                   >
-                    {selectedDocumentIds.length === 1 && selectedDoc ? (
+                    {selectedDocumentIds.length === documents.length && documents.length > 0 ? (
                       <>
-                        <FileText className="w-3 h-3 text-teal-400" />
+                        <Globe className="w-3 h-3 text-teal-600 dark:text-teal-400" />
+                        <span>All Documents ({documents.length})</span>
+                      </>
+                    ) : selectedDocumentIds.length === 1 && selectedDoc ? (
+                      <>
+                        <FileText className="w-3 h-3 text-teal-600 dark:text-teal-400" />
                         <span className="truncate max-w-[130px]">{selectedDoc.filename}</span>
                       </>
                     ) : selectedDocumentIds.length > 1 ? (
                       <>
-                        <FileText className="w-3 h-3 text-teal-400" />
-                        <span>{selectedDocumentIds.length} Docs Scoped (Multi-RAG)</span>
+                        <FileText className="w-3 h-3 text-teal-600 dark:text-teal-400" />
+                        <span>{selectedDocumentIds.length} Docs Scoped</span>
                       </>
                     ) : (
                       <>
-                        <Globe className="w-3 h-3 text-slate-400" />
-                        <span>All Documents ({documents.length})</span>
+                        <FileText className="w-3 h-3 text-slate-400" />
+                        <span>No Documents Selected</span>
                       </>
                     )}
                     <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
                   </button>
 
                   {showDocScopeMenu && (
-                    <div className="absolute left-0 bottom-full mb-1.5 w-64 bg-[#0f172a] border border-slate-700/90 rounded-xl shadow-2xl py-2 z-40 animate-fade-in glass-panel max-h-60 overflow-y-auto">
-                      <div className="flex items-center justify-between px-3 pb-1.5 mb-1 border-b border-slate-800 text-[10px] text-slate-400">
-                        <span className="font-semibold uppercase tracking-wider">Scope Documents</span>
+                    <div className="absolute left-0 bottom-full mb-1.5 w-72 bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-700/90 rounded-2xl shadow-2xl py-2 z-40 animate-fade-in glass-panel max-h-72 overflow-y-auto custom-scrollbar">
+                      <div className="flex items-center justify-between px-3.5 pb-2 mb-1.5 border-b border-slate-200 dark:border-slate-800 text-[10px] text-slate-500 dark:text-slate-400">
+                        <span className="font-bold uppercase tracking-wider">Scope Documents</span>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
                             onClick={selectAllDocuments}
-                            className="text-teal-400 hover:underline"
+                            className="text-teal-600 dark:text-teal-400 font-semibold hover:underline"
                           >
                             All
                           </button>
                           <button
                             type="button"
                             onClick={clearDocumentSelection}
-                            className="text-slate-400 hover:text-slate-200 hover:underline"
+                            className="text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:underline"
                           >
                             Clear
                           </button>
                         </div>
                       </div>
+
                       {documents.length === 0 ? (
-                        <p className="px-3 py-2 text-xs text-slate-500">No documents uploaded yet</p>
+                        <p className="px-3.5 py-3 text-xs text-slate-500 text-center">No documents uploaded yet</p>
                       ) : (
-                        documents.map((d) => {
-                          const checked = selectedDocumentIds.includes(d.id);
-                          return (
-                            <label
-                              key={d.id}
-                              className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-800/60 cursor-pointer text-xs transition-colors"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleDocumentSelection(d.id)}
-                                className="w-3.5 h-3.5 rounded border-slate-700 text-teal-500 accent-teal-500 cursor-pointer"
-                              />
-                              <span className="truncate text-slate-200" title={d.filename}>
-                                {d.filename}
-                              </span>
-                            </label>
-                          );
-                        })
+                        <div className="space-y-0.5 px-1.5">
+                          {/* Master Select All Checkbox Option */}
+                          <label
+                            className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 cursor-pointer text-xs font-semibold text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-800/60 pb-2 mb-1 transition-colors"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={documents.length > 0 && selectedDocumentIds.length === documents.length}
+                              onChange={() => {
+                                if (selectedDocumentIds.length === documents.length) {
+                                  clearDocumentSelection();
+                                } else {
+                                  selectAllDocuments();
+                                }
+                              }}
+                              className="w-3.5 h-3.5 rounded border-slate-400 text-teal-600 accent-teal-600 cursor-pointer"
+                            />
+                            <span className="flex-1">Select All Documents ({documents.length})</span>
+                          </label>
+
+                          {/* Individual Documents */}
+                          {documents.map((d) => {
+                            const checked = selectedDocumentIds.includes(d.id);
+                            return (
+                              <label
+                                key={d.id}
+                                className={clsx(
+                                  'flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl cursor-pointer text-xs transition-colors',
+                                  checked
+                                    ? 'bg-teal-50/70 dark:bg-teal-950/40 text-teal-900 dark:text-teal-200 font-medium'
+                                    : 'hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300'
+                                )}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleDocumentSelection(d.id)}
+                                  className="w-3.5 h-3.5 rounded border-slate-400 text-teal-600 accent-teal-600 cursor-pointer"
+                                />
+                                <FileText className="w-3 h-3 flex-shrink-0 text-slate-400" />
+                                <span className="truncate" title={d.filename}>
+                                  {d.filename}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   )}
@@ -1313,6 +1562,16 @@ const ChatView: React.FC = () => {
                 >
                   <BarChart3 className="w-3 h-3 text-teal-400" />
                   <span>Analytics & Graph</span>
+                </button>
+
+                {/* Quiz & Flashcards Hub Button */}
+                <button
+                  onClick={() => setActiveTab('study')}
+                  className="flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/20 transition-all font-medium"
+                  title="Generate interactive quiz or study flashcards for scoped document(s)"
+                >
+                  <GraduationCap className="w-3 h-3 text-cyan-400" />
+                  <span>Quiz & Study</span>
                 </button>
               </div>
 

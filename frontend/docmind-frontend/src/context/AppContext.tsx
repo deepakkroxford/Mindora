@@ -15,8 +15,8 @@ interface AppContextType {
   fetchDocuments: () => Promise<void>;
   deleteDocument: (id: string) => Promise<void>;
   isLoadingDocuments: boolean;
-  activeTab: 'chat' | 'search' | 'chunks' | 'guide';
-  setActiveTab: (tab: 'chat' | 'search' | 'chunks' | 'guide') => void;
+  activeTab: 'chat' | 'search' | 'chunks' | 'guide' | 'study';
+  setActiveTab: (tab: 'chat' | 'search' | 'chunks' | 'guide' | 'study') => void;
   isSidebarOpen: boolean;
   setIsSidebarOpen: (v: boolean) => void;
   conversations: ConversationDto[];
@@ -33,7 +33,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [documents, setDocuments] = useState<DocumentMetadataDto[]>([]);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'search' | 'chunks' | 'guide'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'search' | 'chunks' | 'guide' | 'study'>('chat');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [conversations, setConversations] = useState<ConversationDto[]>([]);
@@ -60,10 +60,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const fetchDocuments = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
     setIsLoadingDocuments(true);
     try {
       const resp = await documentApi.getAll();
-      if (resp.success) setDocuments(resp.data);
+      if (resp.success && resp.data) {
+        setDocuments(resp.data);
+      }
     } catch (err) {
       console.error('Failed to fetch documents', err);
     } finally {

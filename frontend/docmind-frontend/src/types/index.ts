@@ -163,3 +163,65 @@ export interface UploadingFile {
   error?: string;
   result?: DocumentResponseDto;
 }
+
+// Study Hub & Quiz Types
+export interface QuizQuestionDto {
+  id: string;
+  question: string;
+  options: string[];
+  correctOptionIndex: number;
+  explanation: string;
+  sourceSnippet?: string;
+}
+
+export interface QuizResponseDto {
+  title: string;
+  documentNames: string[];
+  questions: QuizQuestionDto[];
+  difficulty: string;
+  isCached: boolean;
+}
+
+export interface FlashcardDto {
+  id: string;
+  front: string;
+  back: string;
+  category?: string;
+  hint?: string;
+}
+
+export interface FlashcardDeckResponseDto {
+  title: string;
+  documentNames: string[];
+  cards: FlashcardDto[];
+  isCached: boolean;
+}
+
+export interface QuizGenerationRequestDto {
+  documentIds?: string[];
+  numQuestions?: number;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  focusArea?: string;
+}
+
+export interface QuizSubmitResultRequestDto {
+  quizTitle: string;
+  documentNames: string[];
+  score: number;
+  totalQuestions: number;
+  percentage: number;
+  difficulty: string;
+}
+
+export interface QuizAttemptResponseDto {
+  id: string;
+  quizTitle: string;
+  documentNames: string[];
+  score: number;
+  totalQuestions: number;
+  percentage: number;
+  difficulty: string;
+  createdAt: string;
+}
+
+

@@ -105,28 +105,28 @@ const GuideView: React.FC<GuideViewProps> = ({ onUploadClick }) => {
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#0b0f19] text-slate-100 p-4 sm:p-8 custom-scrollbar">
+    <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 p-4 sm:p-8 custom-scrollbar">
       <div className="max-w-5xl mx-auto space-y-12 pb-16 animate-fade-in">
         
         {/* ── 1. Hero Platform Banner ── */}
-        <div className="relative overflow-hidden rounded-3xl border border-slate-700/60 bg-gradient-to-br from-[#0f172a] via-[#111c35] to-[#0b1329] p-6 sm:p-10 shadow-2xl">
+        <div className="relative overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-700/60 bg-gradient-to-br from-white via-teal-50/50 to-slate-100 dark:from-[#0f172a] dark:via-[#111c35] dark:to-[#0b1329] p-6 sm:p-10 shadow-xl dark:shadow-2xl">
           <div className="absolute top-0 right-0 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
           <div className="absolute bottom-0 left-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20" />
 
           <div className="relative z-10 space-y-5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-semibold tracking-wide">
-              <Sparkles className="w-3.5 h-3.5 text-teal-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-600 dark:text-teal-300 text-xs font-semibold tracking-wide">
+              <Sparkles className="w-3.5 h-3.5 text-teal-500 dark:text-teal-400 animate-pulse" />
               <span>MINDORA ENTERPRISE RAG PLATFORM</span>
             </div>
 
-            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight">
+            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
               Next-Generation Document Intelligence & <br className="hidden sm:inline" />
-              <span className="bg-gradient-to-r from-teal-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-teal-600 via-cyan-600 to-emerald-600 dark:from-teal-400 dark:via-cyan-400 dark:to-emerald-400 bg-clip-text text-transparent">
                 Multi-Modal RAG Architecture
               </span>
             </h1>
 
-            <p className="text-sm sm:text-base text-slate-300 max-w-3xl leading-relaxed">
+            <p className="text-sm sm:text-base text-slate-700 dark:text-slate-300 max-w-3xl leading-relaxed">
               Mindora is a production-grade Document Analysis & Question-Answering system built on 
               <strong> Spring Boot 3.4.3</strong>, <strong>PostgreSQL pgvector</strong>, <strong>Spring AI</strong>, and <strong>React</strong>. 
               It provides parallel hybrid semantic + keyword retrieval, out-of-domain guardrails, real-time voice chat, and deep citation verification.
@@ -136,60 +136,60 @@ const GuideView: React.FC<GuideViewProps> = ({ onUploadClick }) => {
             <div className="flex items-center gap-3 pt-2 flex-wrap">
               <button
                 onClick={() => setActiveTab('chat')}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-cyan-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-teal-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-cyan-500 !text-white text-xs sm:text-sm font-semibold shadow-lg shadow-teal-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
-                <MessageSquare className="w-4 h-4" />
-                <span>Launch Chat Assistant</span>
-                <ArrowRight className="w-4 h-4 ml-1" />
+                <MessageSquare className="w-4 h-4 !text-white" />
+                <span className="!text-white">Launch Chat Assistant</span>
+                <ArrowRight className="w-4 h-4 ml-1 !text-white" />
               </button>
 
               {onUploadClick && (
                 <button
                   onClick={onUploadClick}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs sm:text-sm font-medium transition-all"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs sm:text-sm font-medium transition-all shadow-sm"
                 >
-                  <Upload className="w-4 h-4 text-teal-400" />
+                  <Upload className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                   <span>Upload Documents</span>
                 </button>
               )}
 
               <button
                 onClick={() => setActiveTab('search')}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs sm:text-sm font-medium transition-all"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs sm:text-sm font-medium transition-all shadow-sm"
               >
-                <Search className="w-4 h-4 text-cyan-400" />
+                <Search className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
                 <span>Semantic Search Explorer</span>
               </button>
             </div>
 
             {/* System Status Pills */}
-            <div className="flex items-center gap-2 pt-4 border-t border-slate-800/80 flex-wrap text-[11px] text-slate-400">
-              <span className="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-800">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="flex items-center gap-2 pt-4 border-t border-slate-200 dark:border-slate-800/80 flex-wrap text-[11px] text-slate-600 dark:text-slate-400">
+              <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-800 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
                 <span>Spring Boot 3.4.3</span>
               </span>
-              <span className="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-800">
-                <Database className="w-3 h-3 text-teal-400" />
+              <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-800 shadow-sm">
+                <Database className="w-3 h-3 text-teal-600 dark:text-teal-400" />
                 <span>PostgreSQL + pgvector</span>
               </span>
-              <span className="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-800">
-                <Brain className="w-3 h-3 text-cyan-400" />
+              <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-800 shadow-sm">
+                <Brain className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
                 <span>Spring AI + OpenAI</span>
               </span>
-              <span className="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-800">
-                <Mic className="w-3 h-3 text-rose-400" />
+              <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-800 shadow-sm">
+                <Mic className="w-3 h-3 text-rose-500 dark:text-rose-400" />
                 <span>Web Speech AI</span>
               </span>
-              <span className="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-800">
-                <ShieldCheck className="w-3 h-3 text-amber-400" />
+              <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-800 shadow-sm">
+                <ShieldCheck className="w-3 h-3 text-amber-500 dark:text-amber-400" />
                 <span>Active Guardrails</span>
               </span>
-              <span className="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-800">
-                <Clock className="w-3 h-3 text-purple-400" />
+              <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-800 shadow-sm">
+                <Clock className="w-3 h-3 text-purple-500 dark:text-purple-400" />
                 <span>Persistent Chat History</span>
               </span>
-              <span className="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-800">
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
+              <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900/90 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-800 shadow-sm">
+                <Zap className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
                 <span>Redis Semantic Cache (6379)</span>
               </span>
             </div>
@@ -199,11 +199,11 @@ const GuideView: React.FC<GuideViewProps> = ({ onUploadClick }) => {
         {/* ── 2. Capabilities Grid ── */}
         <div className="space-y-6">
           <div className="space-y-1">
-            <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-teal-400" />
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-teal-600 dark:text-teal-400" />
               <span>Core Platform Capabilities</span>
             </h2>
-            <p className="text-xs sm:text-sm text-slate-400">
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
               Engineered for accuracy, low latency, and zero hallucination across complex document bases.
             </p>
           </div>
@@ -212,11 +212,11 @@ const GuideView: React.FC<GuideViewProps> = ({ onUploadClick }) => {
             {capabilities.map((cap, idx) => (
               <div
                 key={idx}
-                className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 space-y-3 hover:border-slate-700 hover:bg-slate-900/90 transition-all duration-200 shadow-sm flex flex-col justify-between"
+                className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-5 space-y-3 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/90 transition-all duration-200 shadow-sm flex flex-col justify-between"
               >
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700/60 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 flex items-center justify-center">
                       {cap.icon}
                     </div>
                     <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border font-mono ${cap.tagColor}`}>
@@ -224,11 +224,11 @@ const GuideView: React.FC<GuideViewProps> = ({ onUploadClick }) => {
                     </span>
                   </div>
 
-                  <h3 className="text-sm font-bold text-slate-100 leading-snug">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
                     {cap.title}
                   </h3>
 
-                  <p className="text-xs text-slate-400 leading-relaxed">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                     {cap.desc}
                   </p>
                 </div>
@@ -240,11 +240,11 @@ const GuideView: React.FC<GuideViewProps> = ({ onUploadClick }) => {
         {/* ── 3. Step-by-Step How To Use Guide ── */}
         <div className="space-y-6">
           <div className="space-y-1">
-            <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-teal-400" />
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-teal-600 dark:text-teal-400" />
               <span>How to Use Mindora (Step-by-Step)</span>
             </h2>
-            <p className="text-xs sm:text-sm text-slate-400">
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
               Follow these simple steps to analyze documents, extract insights, and compare files.
             </p>
           </div>
@@ -253,16 +253,16 @@ const GuideView: React.FC<GuideViewProps> = ({ onUploadClick }) => {
             {steps.map((step, idx) => (
               <div
                 key={idx}
-                className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 space-y-3 relative overflow-hidden"
+                className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 p-5 space-y-3 relative overflow-hidden shadow-sm"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-2xl font-black text-teal-500/30 font-mono">
+                  <span className="text-2xl font-black text-teal-600/30 dark:text-teal-500/30 font-mono">
                     {step.num}
                   </span>
                   {step.action && (
                     <button
                       onClick={step.action.onClick}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-teal-400 hover:text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 px-2.5 py-1 rounded-lg transition-colors"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 bg-teal-50 dark:bg-teal-500/10 hover:bg-teal-100 dark:hover:bg-teal-500/20 border border-teal-200 dark:border-teal-500/20 px-2.5 py-1 rounded-lg transition-colors"
                     >
                       <step.action.icon className="w-3.5 h-3.5" />
                       <span>{step.action.label}</span>
@@ -270,11 +270,11 @@ const GuideView: React.FC<GuideViewProps> = ({ onUploadClick }) => {
                   )}
                 </div>
 
-                <h3 className="text-sm font-bold text-slate-200">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-200">
                   {step.title}
                 </h3>
 
-                <p className="text-xs text-slate-400 leading-relaxed">
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                   {step.desc}
                 </p>
               </div>
@@ -283,41 +283,41 @@ const GuideView: React.FC<GuideViewProps> = ({ onUploadClick }) => {
         </div>
 
         {/* ── 4. Technical Architecture Flowchart ── */}
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/50 p-6 sm:p-8 space-y-6">
+        <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-6 sm:p-8 space-y-6 shadow-sm">
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-              <Cpu className="w-5 h-5 text-cyan-400" />
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Cpu className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
               <span>High-Level Technical Architecture</span>
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-600 dark:text-slate-400">
               End-to-end data ingestion, vector indexing, and parallel hybrid inference pipeline.
             </p>
           </div>
 
           {/* Architecture Pipeline Flow */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
-              <span className="text-[10px] font-bold text-teal-400 font-mono uppercase">1. INGESTION</span>
-              <h4 className="text-xs font-bold text-slate-200">Apache Tika + Chunking</h4>
-              <p className="text-[11px] text-slate-400">Parses PDF, DOCX, TXT into 700-char semantic chunks with 100-char overlap.</p>
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1.5 shadow-sm">
+              <span className="text-[10px] font-bold text-teal-600 dark:text-teal-400 font-mono uppercase">1. INGESTION</span>
+              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-200">Apache Tika + Chunking</h4>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400">Parses PDF, DOCX, TXT into 700-char semantic chunks with 100-char overlap.</p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
-              <span className="text-[10px] font-bold text-cyan-400 font-mono uppercase">2. VECTORIZATION</span>
-              <h4 className="text-xs font-bold text-slate-200">OpenAI + pgvector</h4>
-              <p className="text-[11px] text-slate-400">Generates 1536-dim embeddings and indexes into PostgreSQL pgvector vector_store.</p>
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1.5 shadow-sm">
+              <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 font-mono uppercase">2. VECTORIZATION</span>
+              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-200">OpenAI + pgvector</h4>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400">Generates 1536-dim embeddings and indexes into PostgreSQL pgvector vector_store.</p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
-              <span className="text-[10px] font-bold text-amber-400 font-mono uppercase">3. HYBRID RETRIEVAL</span>
-              <h4 className="text-xs font-bold text-slate-200">Async Vector + Keyword</h4>
-              <p className="text-[11px] text-slate-400">Runs pgvector cosine similarity + SQL ILIKE concurrently, merged with RRF K=60.</p>
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1.5 shadow-sm">
+              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 font-mono uppercase">3. HYBRID RETRIEVAL</span>
+              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-200">Async Vector + Keyword</h4>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400">Runs pgvector cosine similarity + SQL ILIKE concurrently, merged with RRF K=60.</p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
-              <span className="text-[10px] font-bold text-emerald-400 font-mono uppercase">4. INFERENCE & STREAM</span>
-              <h4 className="text-xs font-bold text-slate-200">Spring AI + SSE</h4>
-              <p className="text-[11px] text-slate-400">Streams tokens directly to React frontend with verified citation references.</p>
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1.5 shadow-sm">
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 font-mono uppercase">4. INFERENCE & STREAM</span>
+              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-200">Spring AI + SSE</h4>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400">Streams tokens directly to React frontend with verified citation references.</p>
             </div>
           </div>
         </div>
@@ -325,16 +325,16 @@ const GuideView: React.FC<GuideViewProps> = ({ onUploadClick }) => {
         {/* ── 5. Bottom Ready CTA ── */}
         <div className="p-6 rounded-2xl bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-teal-500/10 border border-teal-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <div>
-            <h3 className="text-base font-bold text-white">Ready to explore your documents?</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Start chatting or search across all indexed chunks in your workspace.</p>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Ready to explore your documents?</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">Start chatting or search across all indexed chunks in your workspace.</p>
           </div>
 
           <div className="flex items-center gap-2.5">
             <button
               onClick={() => setActiveTab('chat')}
-              className="px-5 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-cyan-500 text-white text-xs font-bold shadow-md transition-all active:scale-95"
+              className="px-5 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-cyan-500 !text-white text-xs font-bold shadow-md transition-all active:scale-95"
             >
-              Start Chatting
+              <span className="!text-white">Start Chatting</span>
             </button>
           </div>
         </div>

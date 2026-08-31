@@ -14,6 +14,11 @@ import type {
   SearchResultDto,
   ForgotPasswordRequestDto,
   ResetPasswordRequestDto,
+  QuizGenerationRequestDto,
+  QuizResponseDto,
+  FlashcardDeckResponseDto,
+  QuizSubmitResultRequestDto,
+  QuizAttemptResponseDto,
 } from '../types';
 
 const api = axios.create({
@@ -164,6 +169,29 @@ export const chatApi = {
 
   getDocumentStarterPrompts: async (documentId: string): Promise<ApiResponse<string[]>> => {
     const { data } = await api.get<ApiResponse<string[]>>(`/chat/suggestions/document/${documentId}`);
+    return data;
+  },
+};
+
+// Study Hub & Quiz APIs
+export const studyApi = {
+  generateQuiz: async (request: QuizGenerationRequestDto): Promise<ApiResponse<QuizResponseDto>> => {
+    const { data } = await api.post<ApiResponse<QuizResponseDto>>('/study/quiz', request);
+    return data;
+  },
+
+  generateFlashcards: async (request: QuizGenerationRequestDto): Promise<ApiResponse<FlashcardDeckResponseDto>> => {
+    const { data } = await api.post<ApiResponse<FlashcardDeckResponseDto>>('/study/flashcards', request);
+    return data;
+  },
+
+  submitQuizResult: async (request: QuizSubmitResultRequestDto): Promise<ApiResponse<QuizAttemptResponseDto>> => {
+    const { data } = await api.post<ApiResponse<QuizAttemptResponseDto>>('/study/quiz/submit', request);
+    return data;
+  },
+
+  getQuizHistory: async (): Promise<ApiResponse<QuizAttemptResponseDto[]>> => {
+    const { data } = await api.get<ApiResponse<QuizAttemptResponseDto[]>>('/study/quiz/history');
     return data;
   },
 };

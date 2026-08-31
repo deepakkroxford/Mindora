@@ -55,7 +55,11 @@ body {
 /* ─── Light Mode (White mode) Full System Overrides ─── */
 html.light body,
 html.light #root,
-html.light main,
+html.light main {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
 html.light .bg-\[\#0b0f19\],
 html.light .bg-\[\#0f172a\] {
   background-color: #f8fafc !important;
@@ -63,7 +67,11 @@ html.light .bg-\[\#0f172a\] {
 }
 
 html.light header,
-html.light aside,
+html.light aside {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
 html.light .bg-\[\#0f172a\]\/90,
 html.light .bg-\[\#0f172a\]\/80,
 html.light .bg-\[\#0f172a\]\/60,
@@ -76,12 +84,17 @@ html.light .bg-\[\#111827\] {
 }
 
 html.light .bg-slate-900,
+html.light .bg-slate-900\/90,
+html.light .bg-slate-900\/85,
 html.light .bg-slate-900\/80,
+html.light .bg-slate-900\/70,
 html.light .bg-slate-900\/60,
 html.light .bg-slate-900\/50,
 html.light .bg-slate-900\/40,
 html.light .bg-slate-950,
+html.light .bg-slate-950\/90,
 html.light .bg-slate-950\/80,
+html.light .bg-slate-950\/70,
 html.light .bg-slate-950\/60,
 html.light .bg-slate-950\/40,
 html.light .bg-\[\#070b14\],
@@ -90,25 +103,30 @@ html.light .bg-\[\#070b14\]\/70,
 html.light .bg-\[\#070b14\]\/60,
 html.light .bg-\[\#1e293b\],
 html.light .bg-\[\#1e293b\]\/50 {
-  background-color: #f1f5f9 !important;
+  background-color: #ffffff !important;
   border-color: #e2e8f0 !important;
+  color: #0f172a !important;
 }
 
 html.light .bg-slate-800,
+html.light .bg-slate-800\/90,
 html.light .bg-slate-800\/80,
 html.light .bg-slate-800\/60,
-html.light .bg-slate-800\/50 {
-  background-color: #e2e8f0 !important;
-  border-color: #cbd5e1 !important;
+html.light .bg-slate-800\/50,
+html.light .bg-slate-800\/40 {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #1e293b !important;
 }
 
 html.light .glass,
 html.light .glass-panel,
 html.light .glass-card,
 html.light .glass-input {
-  background-color: rgba(255, 255, 255, 0.9) !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
   border-color: #e2e8f0 !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02) !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03) !important;
+  color: #0f172a !important;
 }
 
 html.light .border-slate-800,
@@ -124,24 +142,45 @@ html.light .border-\[\#334155\] {
   border-color: #e2e8f0 !important;
 }
 
-html.light .text-white,
-html.light .text-slate-100,
-html.light .text-slate-200 {
+/* Light mode text hierarchy */
+html.light h1,
+html.light h2,
+html.light h3,
+html.light h4,
+html.light h5,
+html.light h6 {
   color: #0f172a !important;
 }
 
-html.light .text-slate-300,
-html.light .text-slate-400 {
-  color: #334155 !important;
+html.light p,
+html.light span:not([class*="text-teal"]):not([class*="text-cyan"]):not([class*="text-rose"]):not([class*="text-amber"]):not([class*="text-emerald"]):not([class*="text-indigo"]):not([class*="text-purple"]):not([class*="!text-white"]) {
+  color: #334155;
 }
 
-html.light .text-slate-500 {
-  color: #64748b !important;
+/* Buttons and badges with colored gradients retain white text */
+html.light button.bg-gradient-to-r,
+html.light .bg-gradient-to-r.from-teal-600,
+html.light .bg-gradient-to-br.from-teal-600,
+html.light button.bg-teal-600,
+html.light button.bg-teal-500,
+html.light button[class*="from-teal"],
+html.light button[class*="from-rose"],
+html.light button[class*="bg-teal"] {
+  color: #ffffff !important;
+}
+
+html.light button.bg-gradient-to-r *,
+html.light .bg-gradient-to-r.from-teal-600 *,
+html.light .bg-gradient-to-br.from-teal-600 *,
+html.light .bg-gradient-to-r.from-teal-500 * {
+  color: #ffffff !important;
 }
 
 html.light textarea,
 html.light input {
+  background-color: #ffffff !important;
   color: #0f172a !important;
+  border-color: #cbd5e1 !important;
 }
 
 html.light textarea::placeholder,
@@ -158,7 +197,7 @@ html.light .prose strong {
 
 html.light .prose p,
 html.light .prose li {
-  color: #334155 !important;
+  color: #1e293b !important;
 }
 
 html.light .prose code {
@@ -369,4 +408,74 @@ input[type=range]::-webkit-slider-thumb {
 }
 input[type=range]:hover::-webkit-slider-thumb {
   box-shadow: 0 0 0 2px #0f172a, 0 0 0 4px #0d9488;
+}
+
+/* ─── Modern IDE Syntax Highlighting (One Dark / VS Code theme) ─── */
+.prism-code-block {
+  color: #abb2bf !important;
+  background-color: #0d121f !important;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
+}
+
+.prism-code-block .token.comment,
+.prism-code-block .token.prolog,
+.prism-code-block .token.doctype,
+.prism-code-block .token.cdata {
+  color: #5c6370 !important;
+  font-style: italic;
+}
+
+.prism-code-block .token.punctuation {
+  color: #abb2bf !important;
+}
+
+.prism-code-block .token.keyword,
+.prism-code-block .token.tag,
+.prism-code-block .token.boolean,
+.prism-code-block .token.constant {
+  color: #c678dd !important; /* Vibrant Purple/Magenta */
+  font-weight: 600;
+}
+
+.prism-code-block .token.string,
+.prism-code-block .token.char,
+.prism-code-block .token.attr-value {
+  color: #98c379 !important; /* Vibrant Green */
+}
+
+.prism-code-block .token.function,
+.prism-code-block .token.function-name,
+.prism-code-block .token.method {
+  color: #61afef !important; /* Sky Blue */
+}
+
+.prism-code-block .token.class-name,
+.prism-code-block .token.type,
+.prism-code-block .token.type-declaration {
+  color: #e5c07b !important; /* Gold / Yellow */
+}
+
+.prism-code-block .token.annotation,
+.prism-code-block .token.decorator {
+  color: #e5c07b !important; /* Java @Service / @KafkaListener in Gold */
+  font-weight: 600;
+}
+
+.prism-code-block .token.number {
+  color: #d19a66 !important; /* Orange */
+}
+
+.prism-code-block .token.operator,
+.prism-code-block .token.entity,
+.prism-code-block .token.url {
+  color: #56b6c2 !important; /* Cyan */
+}
+
+.prism-code-block .token.property,
+.prism-code-block .token.attr-name {
+  color: #e06c75 !important; /* Coral Red for YAML/JSON keys */
+}
+
+.prism-code-block .token.variable {
+  color: #e06c75 !important;
 }

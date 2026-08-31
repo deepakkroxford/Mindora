@@ -3,6 +3,7 @@ import {
   Brain, MessageSquare, Search, Layers, Plus, Upload, Trash2, ChevronDown, ChevronUp,
   CheckCircle, Clock, AlertCircle, Loader2, X, FileType, FilePieChart, FileText, File,
   FolderOpen, Sun, Moon, LogOut, Sparkles, Filter, Check, PanelLeftClose, Edit2, BookOpen,
+  GraduationCap,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
@@ -388,7 +389,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onUploadClick }) => {
     { id: 'chat' as const, label: 'Chat Assistant', icon: MessageSquare, badge: null },
     { id: 'search' as const, label: 'Semantic Search', icon: Search, badge: null },
     { id: 'chunks' as const, label: 'Vector Chunks', icon: Layers, badge: documents.length > 0 ? `${documents.length}` : null },
-    { id: 'guide' as const, label: 'Platform Guide & Arch', icon: BookOpen, badge: 'NEW' },
   ];
 
   return (

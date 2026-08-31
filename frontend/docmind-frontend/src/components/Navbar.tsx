@@ -2,6 +2,7 @@ import React from 'react';
 import {
   PanelLeft, FileText, X, ChevronRight, Upload, Sparkles,
   Layers, Search, MessageSquare, Globe, Sun, Moon, BookOpen,
+  GraduationCap,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
@@ -34,6 +35,8 @@ const Navbar: React.FC<NavbarProps> = ({ onUploadClick }) => {
         return { label: 'Semantic Search', icon: Search };
       case 'chunks':
         return { label: 'Vector Chunks Explorer', icon: Layers };
+      case 'study':
+        return { label: 'Study & Quiz Hub', icon: GraduationCap };
       case 'guide':
         return { label: 'Platform Guide & Arch', icon: BookOpen };
       default:
@@ -95,8 +98,22 @@ const Navbar: React.FC<NavbarProps> = ({ onUploadClick }) => {
         <span>{currentTab.label}</span>
       </div>
 
-      {/* Right: Theme Toggle, Guide & Quick Actions */}
+      {/* Right: Theme Toggle, Study Hub, Guide & Quick Actions */}
       <div className="flex items-center gap-2 flex-shrink-0">
+        <button
+          onClick={() => setActiveTab(activeTab === 'study' ? 'chat' : 'study')}
+          className={clsx(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all',
+            activeTab === 'study'
+              ? 'bg-teal-500/20 text-teal-300 border-teal-500/40 shadow-sm shadow-teal-500/10'
+              : 'bg-slate-800/80 text-slate-300 border-slate-700/80 hover:text-teal-300 hover:bg-slate-700'
+          )}
+          title="Interactive Study & Quiz Hub"
+        >
+          <GraduationCap className="w-3.5 h-3.5 text-teal-400" />
+          <span className="hidden sm:inline">Quiz & Study</span>
+        </button>
+
         <button
           onClick={() => setActiveTab(activeTab === 'guide' ? 'chat' : 'guide')}
           className={clsx(
