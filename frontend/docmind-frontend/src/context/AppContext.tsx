@@ -15,8 +15,8 @@ interface AppContextType {
   fetchDocuments: () => Promise<void>;
   deleteDocument: (id: string) => Promise<void>;
   isLoadingDocuments: boolean;
-  activeTab: 'chat' | 'search' | 'chunks' | 'guide' | 'study' | 'mindmap';
-  setActiveTab: (tab: 'chat' | 'search' | 'chunks' | 'guide' | 'study' | 'mindmap') => void;
+  activeTab: 'chat' | 'search' | 'chunks' | 'guide' | 'study' | 'mindmap' | 'tokens';
+  setActiveTab: (tab: 'chat' | 'search' | 'chunks' | 'guide' | 'study' | 'mindmap' | 'tokens') => void;
   isSidebarOpen: boolean;
   setIsSidebarOpen: (v: boolean) => void;
   conversations: ConversationDto[];
@@ -33,7 +33,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [documents, setDocuments] = useState<DocumentMetadataDto[]>([]);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'search' | 'chunks' | 'guide' | 'study' | 'mindmap'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'search' | 'chunks' | 'guide' | 'study' | 'mindmap' | 'tokens'>('chat');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [conversations, setConversations] = useState<ConversationDto[]>([]);

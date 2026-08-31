@@ -12,6 +12,7 @@ import ChunksView from './components/ChunksView';
 import GuideView from './components/GuideView';
 import StudyHubView from './components/StudyHubView';
 import MindMapView from './components/MindMapView';
+import TokenUsageDashboardView from './components/TokenUsageDashboardView';
 import UploadDialog from './components/UploadDialog';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -45,6 +46,7 @@ const ProtectedLayout: React.FC = () => {
           {activeTab === 'chunks' && <ChunksView />}
           {activeTab === 'study' && <StudyHubView />}
           {activeTab === 'mindmap' && <MindMapView />}
+          {activeTab === 'tokens' && <TokenUsageDashboardView />}
           {activeTab === 'guide' && <GuideView onUploadClick={() => setIsUploadOpen(true)} />}
         </main>
       </div>

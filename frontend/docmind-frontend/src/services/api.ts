@@ -23,6 +23,7 @@ import type {
   MindMapResponseDto,
   MindMapGenerationRequestDto,
   DocumentDiagramDto,
+  TokenAnalyticsDto,
 } from '../types';
 
 const api = axios.create({
@@ -223,6 +224,25 @@ export const mindMapApi = {
   deleteMindMap: async (id: string): Promise<ApiResponse<void>> => {
     const { data } = await api.delete<ApiResponse<void>>(`/mindmap/${id}`);
     return data;
+  },
+};
+
+// Token Analytics APIs
+export const analyticsApi = {
+  getTokenSummary: async (days: number = 30): Promise<ApiResponse<TokenAnalyticsDto>> => {
+    const { data } = await api.get<ApiResponse<TokenAnalyticsDto>>(`/analytics/tokens/summary?days=${days}`);
+    return data;
+  },
+
+  downloadCsv: async (days: number = 30): Promise<Blob> => {
+    const res = await api.get(`/analytics/tokens/export?days=${days}`, {
+      responseType: 'blob',
+    });
+    return res.data;
+  },
+
+  exportCsvUrl: (days: number = 30): string => {
+    return `/api/v1/analytics/tokens/export?days=${days}`;
   },
 };
 

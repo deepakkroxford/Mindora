@@ -34,6 +34,7 @@ public class MindMapService {
     private final DocumentMetadataRepo documentMetadataRepo;
     private final MindMapRecordRepository mindMapRecordRepository;
     private final UserRepository userRepository;
+    private final TokenUsageService tokenUsageService;
 
     private static final String MINDMAP_CACHE_PREFIX = "rag:cache:mindmap:";
 
@@ -44,7 +45,8 @@ public class MindMapService {
             StringRedisTemplate stringRedisTemplate,
             DocumentMetadataRepo documentMetadataRepo,
             MindMapRecordRepository mindMapRecordRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            TokenUsageService tokenUsageService) {
         this.chatClient = chatClient;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
@@ -52,6 +54,7 @@ public class MindMapService {
         this.documentMetadataRepo = documentMetadataRepo;
         this.mindMapRecordRepository = mindMapRecordRepository;
         this.userRepository = userRepository;
+        this.tokenUsageService = tokenUsageService;
     }
 
     /**
@@ -184,6 +187,16 @@ public class MindMapService {
                 MindMapRecord saved = mindMapRecordRepository.save(record);
                 savedId = saved.getId();
                 log.info("Saved MindMap record #{} for user {}: {} nodes, {} tokens used", savedId, userEmail, totalNodes, totalTokensUsed);
+
+                tokenUsageService.recordEvent(
+                        userId,
+                        "MINDMAP",
+                        promptTokens,
+                        completionTokens,
+                        docIds.isEmpty() ? null : docIds.get(0),
+                        docNamesStr,
+                        "Mind Map: " + title
+                );
             } catch (Exception e) {
                 log.warn("Could not persist mind map record to PostgreSQL: {}", e.getMessage());
             }

@@ -32,6 +32,7 @@ public class StudyDeckService {
     private final DocumentMetadataRepo documentMetadataRepo;
     private final QuizAttemptRepository quizAttemptRepository;
     private final UserRepository userRepository;
+    private final TokenUsageService tokenUsageService;
 
     private static final String QUIZ_CACHE_PREFIX = "rag:cache:quiz:";
     private static final String FLASHCARD_CACHE_PREFIX = "rag:cache:flashcards:";
@@ -43,7 +44,8 @@ public class StudyDeckService {
             StringRedisTemplate stringRedisTemplate,
             DocumentMetadataRepo documentMetadataRepo,
             QuizAttemptRepository quizAttemptRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            TokenUsageService tokenUsageService) {
         this.chatClient = chatClient;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
@@ -51,6 +53,7 @@ public class StudyDeckService {
         this.documentMetadataRepo = documentMetadataRepo;
         this.quizAttemptRepository = quizAttemptRepository;
         this.userRepository = userRepository;
+        this.tokenUsageService = tokenUsageService;
     }
 
     /**
@@ -124,7 +127,20 @@ public class StudyDeckService {
                 return getFallbackQuiz(docNames, difficulty);
             }
 
+            int promptTokens = Math.max(prompt.length() / 4, 100);
+            int completionTokens = Math.max(response.length() / 4, 100);
+
             String title = docNames.isEmpty() ? "Workspace Knowledge Quiz" : docNames.get(0) + (docNames.size() > 1 ? " & more" : "") + " Quiz";
+
+            tokenUsageService.recordEvent(
+                    null,
+                    "QUIZ",
+                    promptTokens,
+                    completionTokens,
+                    docIds.isEmpty() ? null : docIds.get(0),
+                    docNames.isEmpty() ? "Workspace" : String.join(", ", docNames),
+                    "AI Quiz: " + title + " (" + count + " questions)"
+            );
 
             QuizResponseDto result = QuizResponseDto.builder()
                     .title(title)
@@ -183,21 +199,15 @@ public class StudyDeckService {
         // 3. Prompt LLM for structured Flashcards JSON
         try {
             String prompt = """
-                    You are an expert tutor creating study flashcards from document material.
-                    Based on the document excerpts provided below, generate %d high-yield study flashcards covering key definitions, principles, metrics, rules, and facts.
-                    
-                    DOCUMENT EXCERPTS:
-                    %s
-                    
-                    REQUIREMENTS:
-                    1. "front": A concise, clear question or core concept (under 20 words).
-                    2. "back": The complete, accurate answer, summary, or definition (under 50 words).
-                    3. "category": A short topic tag (e.g. "Architecture", "Key Definition", "Compliance", "Metric", "Formula").
-                    4. "hint": A brief helpful mnemonic or clue.
-                    5. "id": A unique string (e.g. "fc-1", "fc-2").
-                    
+                    You are an expert tutor creating active-recall study flashcards based STRICTLY on the document excerpts provided below.
+
+                    TASK:
+                    Generate exactly %d flashcards designed for spaced repetition.
+                    Focus on key terms, architectural components, concepts, and definitions.
+
                     OUTPUT FORMAT:
-                    Output ONLY a valid JSON array of objects with the exact structure below, without markdown code fences:
+                    Return ONLY a valid JSON array of flashcard objects. No markdown code fences, no extra text.
+                    Schema:
                     [
                       {
                         "id": "fc-1",
@@ -216,7 +226,20 @@ public class StudyDeckService {
                 return getFallbackFlashcards(docNames);
             }
 
+            int promptTokens = Math.max(prompt.length() / 4, 100);
+            int completionTokens = Math.max(response.length() / 4, 100);
+
             String title = docNames.isEmpty() ? "Workspace Study Flashcards" : docNames.get(0) + " Flashcards";
+
+            tokenUsageService.recordEvent(
+                    null,
+                    "QUIZ",
+                    promptTokens,
+                    completionTokens,
+                    docIds.isEmpty() ? null : docIds.get(0),
+                    docNames.isEmpty() ? "Workspace" : String.join(", ", docNames),
+                    "Flashcards: " + title + " (" + count + " cards)"
+            );
 
             FlashcardDeckResponseDto result = FlashcardDeckResponseDto.builder()
                     .title(title)

@@ -265,5 +265,46 @@ export interface MindMapGenerationRequestDto {
   focusArea?: string;
 }
 
+// Token Usage & Analytics Types
+export interface TokenEventDto {
+  id: string;
+  category: 'CHAT' | 'MINDMAP' | 'QUIZ' | string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  documentId?: string;
+  documentName?: string;
+  description?: string;
+  estimatedCost: number;
+  createdAt: string;
+}
 
+export interface TokenCategorySummaryDto {
+  category: string;
+  totalTokens: number;
+  requestCount: number;
+  promptTokens: number;
+  completionTokens: number;
+  estimatedCost: number;
+  percentage: number;
+}
 
+export interface DailyTokenUsageDto {
+  date: string;
+  chatTokens: number;
+  mindMapTokens: number;
+  quizTokens: number;
+  totalTokens: number;
+  estimatedCost: number;
+}
+
+export interface TokenAnalyticsDto {
+  totalTokensAllTime: number;
+  totalTokensPeriod: number;
+  totalEstimatedCost: number;
+  totalOperations: number;
+  dailyAverageTokens: number;
+  categoryBreakdown: Record<string, TokenCategorySummaryDto>;
+  dailyUsage: DailyTokenUsageDto[];
+  recentEvents: TokenEventDto[];
+}

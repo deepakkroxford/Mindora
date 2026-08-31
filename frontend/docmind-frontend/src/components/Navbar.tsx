@@ -2,7 +2,7 @@ import React from 'react';
 import {
   PanelLeft, FileText, X, ChevronRight, Upload, Sparkles,
   Layers, Search, MessageSquare, Globe, Sun, Moon, BookOpen,
-  GraduationCap, Brain,
+  GraduationCap, Brain, BarChart3,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
@@ -39,6 +39,8 @@ const Navbar: React.FC<NavbarProps> = ({ onUploadClick }) => {
         return { label: 'Study & Quiz Hub', icon: GraduationCap };
       case 'mindmap':
         return { label: 'Concept Mind Map', icon: Brain };
+      case 'tokens':
+        return { label: 'Token Analytics & Cost', icon: BarChart3 };
       case 'guide':
         return { label: 'Platform Guide & Arch', icon: BookOpen };
       default:
@@ -100,7 +102,7 @@ const Navbar: React.FC<NavbarProps> = ({ onUploadClick }) => {
         <span>{currentTab.label}</span>
       </div>
 
-      {/* Right: Theme Toggle, Mind Map, Study Hub, Guide & Quick Actions */}
+      {/* Right: Theme Toggle, Mind Map, Study Hub, Token Usage, Guide & Quick Actions */}
       <div className="flex items-center gap-2 flex-shrink-0">
         <button
           onClick={() => setActiveTab(activeTab === 'mindmap' ? 'chat' : 'mindmap')}
@@ -128,6 +130,20 @@ const Navbar: React.FC<NavbarProps> = ({ onUploadClick }) => {
         >
           <GraduationCap className="w-3.5 h-3.5 text-teal-400" />
           <span className="hidden sm:inline">Quiz & Study</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab(activeTab === 'tokens' ? 'chat' : 'tokens')}
+          className={clsx(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all',
+            activeTab === 'tokens'
+              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-sm shadow-cyan-500/10'
+              : 'bg-slate-800/80 text-slate-300 border-slate-700/80 hover:text-cyan-300 hover:bg-slate-700'
+          )}
+          title="Token Usage Breakdown & Analytics"
+        >
+          <BarChart3 className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="hidden sm:inline">Token Usage</span>
         </button>
 
         <button

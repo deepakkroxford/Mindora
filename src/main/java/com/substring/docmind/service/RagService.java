@@ -39,6 +39,7 @@ public class RagService {
     private final ChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
     private final DocumentDiagramRepository documentDiagramRepository;
+    private final TokenUsageService tokenUsageService;
     private final PlatformTransactionManager transactionManager;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -53,6 +54,7 @@ public class RagService {
             ChatMessageRepository chatMessageRepository,
             UserRepository userRepository,
             DocumentDiagramRepository documentDiagramRepository,
+            TokenUsageService tokenUsageService,
             PlatformTransactionManager transactionManager,
             JdbcTemplate jdbcTemplate,
             ObjectMapper objectMapper,
@@ -65,6 +67,7 @@ public class RagService {
         this.chatMessageRepository = chatMessageRepository;
         this.userRepository = userRepository;
         this.documentDiagramRepository = documentDiagramRepository;
+        this.tokenUsageService = tokenUsageService;
         this.transactionManager = transactionManager;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
@@ -223,6 +226,16 @@ public class RagService {
                 chatMessageRepository.saveAndFlush(chatMessage);
                 log.info("Saved chat message id={} for conversation id={} (tokens: prompt={}, completion={}, total={})",
                         chatMessage.getId(), conversation.getId(), promptTokens, completionTokens, totalTokens);
+
+                tokenUsageService.recordEvent(
+                        user != null ? user.getId() : null,
+                        "CHAT",
+                        promptTokens,
+                        completionTokens,
+                        primaryDocId,
+                        (citationDtos != null && !citationDtos.isEmpty()) ? citationDtos.get(0).getFileName() : "Workspace",
+                        request.getQuestion()
+                );
 
                 conversation.setMessageCount(conversation.getMessageCount() + 1);
                 return conversationRepository.saveAndFlush(conversation);
