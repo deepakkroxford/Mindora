@@ -19,6 +19,9 @@ import type {
   FlashcardDeckResponseDto,
   QuizSubmitResultRequestDto,
   QuizAttemptResponseDto,
+  MindMapNodeDto,
+  MindMapResponseDto,
+  MindMapGenerationRequestDto,
 } from '../types';
 
 const api = axios.create({
@@ -192,6 +195,24 @@ export const studyApi = {
 
   getQuizHistory: async (): Promise<ApiResponse<QuizAttemptResponseDto[]>> => {
     const { data } = await api.get<ApiResponse<QuizAttemptResponseDto[]>>('/study/quiz/history');
+    return data;
+  },
+};
+
+// Mind Map APIs
+export const mindMapApi = {
+  generateMindMap: async (request: MindMapGenerationRequestDto): Promise<ApiResponse<MindMapResponseDto>> => {
+    const { data } = await api.post<ApiResponse<MindMapResponseDto>>('/mindmap/generate', request);
+    return data;
+  },
+
+  getSavedMindMaps: async (): Promise<ApiResponse<MindMapResponseDto[]>> => {
+    const { data } = await api.get<ApiResponse<MindMapResponseDto[]>>('/mindmap/saved');
+    return data;
+  },
+
+  deleteMindMap: async (id: string): Promise<ApiResponse<void>> => {
+    const { data } = await api.delete<ApiResponse<void>>(`/mindmap/${id}`);
     return data;
   },
 };

@@ -224,4 +224,32 @@ export interface QuizAttemptResponseDto {
   createdAt: string;
 }
 
+// Mind Map & Concept Hierarchy Types
+export interface MindMapNodeDto {
+  id: string;
+  label: string;
+  description: string;
+  category: string;
+  keywords: string[];
+  children?: MindMapNodeDto[];
+}
+
+export interface MindMapResponseDto {
+  id?: string;
+  title: string;
+  documentNames: string[];
+  rootNode: MindMapNodeDto;
+  totalNodes: number;
+  tokensUsed?: number;
+  isCached: boolean;
+  createdAt?: string;
+}
+
+export interface MindMapGenerationRequestDto {
+  documentIds?: string[];
+  maxDepth?: number;
+  focusArea?: string;
+}
+
+
 
