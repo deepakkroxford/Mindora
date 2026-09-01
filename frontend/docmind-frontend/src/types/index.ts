@@ -42,6 +42,17 @@ export interface DocumentDiagramDto {
   caption?: string;
 }
 
+export interface DocumentChunkDto {
+  id?: string;
+  documentId: string;
+  chunkIndex: number;
+  pageNumber: number;
+  content: string;
+  charLength: number;
+  estimatedTokens: number;
+  metadata?: Record<string, unknown>;
+}
+
 export interface CitationDto {
   documentId: string;
   fileName: string;

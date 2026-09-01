@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
-  Send, Bot, User, Loader2, ChevronDown, ChevronUp, FileText,
+  Send, Bot, User, Loader2, ChevronDown, ChevronUp, ChevronRight, FileText,
   Zap, Sparkles, RotateCcw, Square, Copy, Check, Wifi, WifiOff,
   AlertTriangle, ThumbsUp, ThumbsDown, MoreHorizontal, MessageSquare, Globe,
   HelpCircle, Lightbulb, Compass, FileCheck, BarChart3, Cpu, Target,
@@ -21,9 +21,12 @@ const PROMPT_TEMPLATES = [
   {
     category: 'Summarization',
     icon: '📋',
-    gradient: 'from-teal-500/10 to-cyan-500/10',
-    border: 'border-teal-500/20 hover:border-teal-500/40',
-    accent: 'text-teal-400',
+    gradient: 'from-sky-500/10 to-blue-500/10',
+    border: 'border-slate-200 dark:border-slate-800 hover:border-sky-400 dark:hover:border-sky-500/50',
+    accent: 'text-sky-700 dark:text-sky-400',
+    badge: 'bg-sky-50 dark:bg-sky-500/10 border-sky-200 dark:border-sky-500/30 text-sky-700 dark:text-sky-300',
+    itemHover: 'hover:bg-sky-50/80 dark:hover:bg-sky-500/10 hover:border-sky-300 dark:hover:border-sky-500/40',
+    itemTitleHover: 'group-hover:text-sky-700 dark:group-hover:text-sky-300',
     templates: [
       { label: 'Executive Summary', prompt: 'Provide a concise executive summary of the key points in this document.' },
       { label: 'Key Findings', prompt: 'What are the key findings, metrics, and conclusions from this document?' },
@@ -33,9 +36,12 @@ const PROMPT_TEMPLATES = [
   {
     category: 'Legal & Risk Analysis',
     icon: '⚖️',
-    gradient: 'from-cyan-500/10 to-blue-500/10',
-    border: 'border-cyan-500/20 hover:border-cyan-500/40',
-    accent: 'text-cyan-400',
+    gradient: 'from-amber-500/10 to-orange-500/10',
+    border: 'border-slate-200 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-500/50',
+    accent: 'text-amber-700 dark:text-amber-400',
+    badge: 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-300',
+    itemHover: 'hover:bg-amber-50/80 dark:hover:bg-amber-500/10 hover:border-amber-300 dark:hover:border-amber-500/40',
+    itemTitleHover: 'group-hover:text-amber-700 dark:group-hover:text-amber-300',
     templates: [
       { label: 'Key Clauses', prompt: 'What are the most important clauses and provisions in this document?' },
       { label: 'Obligations & Roles', prompt: 'What obligations, responsibilities, and liabilities are defined?' },
@@ -46,8 +52,11 @@ const PROMPT_TEMPLATES = [
     category: 'Insights & Data',
     icon: '🔍',
     gradient: 'from-emerald-500/10 to-teal-500/10',
-    border: 'border-emerald-500/20 hover:border-emerald-500/40',
-    accent: 'text-emerald-400',
+    border: 'border-slate-200 dark:border-slate-800 hover:border-emerald-400 dark:hover:border-emerald-500/50',
+    accent: 'text-emerald-700 dark:text-emerald-400',
+    badge: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300',
+    itemHover: 'hover:bg-emerald-50/80 dark:hover:bg-emerald-500/10 hover:border-emerald-300 dark:hover:border-emerald-500/40',
+    itemTitleHover: 'group-hover:text-emerald-700 dark:group-hover:text-emerald-300',
     templates: [
       { label: 'Data Points & Stats', prompt: 'Extract all key numerical data points, statistics, and tables.' },
       { label: 'Definitions', prompt: 'List and explain all key terms, acronyms, and definitions used.' },
@@ -204,14 +213,14 @@ function renderMarkdown(content: string): React.ReactNode[] {
     const parts = text.split(/(\*\*.*?\*\*|`.*?`|\*.*?\*|_.*?_)/g);
     return parts.map((part, j) => {
       if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={j} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+        return <strong key={j} className="font-bold text-slate-900 dark:text-white">{part.slice(2, -2)}</strong>;
       }
       if ((part.startsWith('*') && part.endsWith('*')) || (part.startsWith('_') && part.endsWith('_'))) {
-        if (part.length > 2) return <em key={j} className="italic text-slate-300">{part.slice(1, -1)}</em>;
+        if (part.length > 2) return <em key={j} className="italic text-slate-700 dark:text-slate-300">{part.slice(1, -1)}</em>;
       }
       if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
         return (
-          <code key={j} className="px-1.5 py-0.5 bg-[#0b0f19] text-teal-300 rounded-md text-xs font-mono border border-slate-800">
+          <code key={j} className="px-1.5 py-0.5 bg-slate-100 dark:bg-[#0b0f19] text-teal-700 dark:text-teal-300 rounded-md text-xs font-mono border border-slate-200 dark:border-slate-800">
             {part.slice(1, -1)}
           </code>
         );
@@ -224,27 +233,27 @@ function renderMarkdown(content: string): React.ReactNode[] {
     const line = lines[i];
 
     if (line.startsWith('### ')) {
-      nodes.push(<h3 key={i} className="text-sm font-semibold text-white mt-3 mb-1">{renderInline(line.slice(4))}</h3>);
+      nodes.push(<h3 key={i} className="text-sm font-bold text-slate-900 dark:text-white mt-3 mb-1">{renderInline(line.slice(4))}</h3>);
       i++;
       continue;
     }
     if (line.startsWith('## ')) {
-      nodes.push(<h2 key={i} className="text-base font-semibold text-white mt-3 mb-1">{renderInline(line.slice(3))}</h2>);
+      nodes.push(<h2 key={i} className="text-base font-bold text-slate-900 dark:text-white mt-3 mb-1">{renderInline(line.slice(3))}</h2>);
       i++;
       continue;
     }
     if (line.startsWith('# ')) {
-      nodes.push(<h1 key={i} className="text-lg font-bold text-white mt-3 mb-1">{renderInline(line.slice(2))}</h1>);
+      nodes.push(<h1 key={i} className="text-lg font-extrabold text-slate-900 dark:text-white mt-3 mb-1">{renderInline(line.slice(2))}</h1>);
       i++;
       continue;
     }
     if (line.startsWith('> ')) {
-      nodes.push(<blockquote key={i} className="border-l-2 border-teal-500 pl-3 text-slate-400 italic my-1.5">{renderInline(line.slice(2))}</blockquote>);
+      nodes.push(<blockquote key={i} className="border-l-2 border-teal-500 pl-3 text-slate-600 dark:text-slate-400 italic my-1.5">{renderInline(line.slice(2))}</blockquote>);
       i++;
       continue;
     }
     if (line.startsWith('---')) {
-      nodes.push(<hr key={i} className="border-slate-800 my-3" />);
+      nodes.push(<hr key={i} className="border-slate-200 dark:border-slate-800 my-3" />);
       i++;
       continue;
     }
@@ -272,7 +281,7 @@ function renderMarkdown(content: string): React.ReactNode[] {
         items.push(<li key={i}>{renderInline(lines[i].slice(2))}</li>);
         i++;
       }
-      nodes.push(<ul key={`ul-${i}`} className="list-disc list-inside space-y-1 ml-1 my-1.5 text-slate-200 leading-relaxed">{items}</ul>);
+      nodes.push(<ul key={`ul-${i}`} className="list-disc list-inside space-y-1 ml-1 my-1.5 text-slate-800 dark:text-slate-200 leading-relaxed">{items}</ul>);
       continue;
     }
 
@@ -283,7 +292,7 @@ function renderMarkdown(content: string): React.ReactNode[] {
         items.push(<li key={i}>{renderInline(lines[i].replace(/^\d+\. /, ''))}</li>);
         i++;
       }
-      nodes.push(<ol key={`ol-${i}`} className="list-decimal list-inside space-y-1 ml-1 my-1.5 text-slate-200 leading-relaxed">{items}</ol>);
+      nodes.push(<ol key={`ol-${i}`} className="list-decimal list-inside space-y-1 ml-1 my-1.5 text-slate-800 dark:text-slate-200 leading-relaxed">{items}</ol>);
       continue;
     }
 
@@ -292,7 +301,7 @@ function renderMarkdown(content: string): React.ReactNode[] {
       i++;
       continue;
     }
-    nodes.push(<p key={i} className="text-slate-200 leading-relaxed mb-2 last:mb-0">{renderInline(line)}</p>);
+    nodes.push(<p key={i} className="text-slate-800 dark:text-slate-200 leading-relaxed mb-2 last:mb-0">{renderInline(line)}</p>);
     i++;
   }
   return nodes;
@@ -308,29 +317,29 @@ const CitationCard: React.FC<{
   const score = citation.similarityScore ?? 0;
   const pct = (score * 100).toFixed(0);
   const barColor = score >= 0.8 ? 'bg-emerald-500' : score >= 0.6 ? 'bg-amber-500' : 'bg-rose-500';
-  const textColor = score >= 0.8 ? 'text-emerald-400' : score >= 0.6 ? 'text-amber-400' : 'text-rose-400';
+  const textColor = score >= 0.8 ? 'text-emerald-600 dark:text-emerald-400' : score >= 0.6 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400';
 
   return (
-    <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-900/60 hover:border-slate-700 transition-all duration-150">
-      <div className="flex items-center justify-between p-2.5 hover:bg-slate-800/30 transition-colors">
+    <div className="border border-slate-200 dark:border-slate-800/80 rounded-xl overflow-hidden bg-white dark:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-150 shadow-sm">
+      <div className="flex items-center justify-between p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
         <button
           onClick={() => setExpanded(!expanded)}
           className="flex-1 flex items-center gap-2.5 text-left min-w-0"
         >
-          <span className="flex-shrink-0 w-5 h-5 bg-teal-500/15 text-teal-400 rounded-md text-[10px] flex items-center justify-center font-bold border border-teal-500/25">
+          <span className="flex-shrink-0 w-5 h-5 bg-teal-50 dark:bg-teal-500/15 text-teal-700 dark:text-teal-400 rounded-md text-[10px] flex items-center justify-center font-bold border border-teal-200 dark:border-teal-500/25">
             {index + 1}
           </span>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              <FileText className="w-3 h-3 flex-shrink-0 text-teal-400" />
-              <p className="text-xs text-slate-200 font-medium truncate">{citation.fileName}</p>
+              <FileText className="w-3 h-3 flex-shrink-0 text-teal-600 dark:text-teal-400" />
+              <p className="text-xs text-slate-800 dark:text-slate-200 font-medium truncate">{citation.fileName}</p>
               {citation.pageNumber && (
-                <span className="text-[10px] text-slate-500 flex-shrink-0 bg-slate-800 px-1 rounded">p.{citation.pageNumber}</span>
+                <span className="text-[10px] text-slate-500 flex-shrink-0 bg-slate-100 dark:bg-slate-800 px-1 rounded">p.{citation.pageNumber}</span>
               )}
             </div>
             {/* Similarity progress */}
             <div className="flex items-center gap-2 mt-1">
-              <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden max-w-40">
+              <div className="flex-1 h-1 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden max-w-40">
                 <div className={clsx('h-1 rounded-full transition-all duration-300', barColor)} style={{ width: `${pct}%` }} />
               </div>
               <span className={clsx('text-[10px] font-bold flex-shrink-0 font-mono', textColor)}>{pct}%</span>
@@ -342,7 +351,7 @@ const CitationCard: React.FC<{
         {onInspect && (
           <button
             onClick={() => onInspect(citation, index)}
-            className="p-1 text-slate-500 hover:text-teal-400 hover:bg-slate-800 rounded transition-colors ml-2 flex-shrink-0"
+            className="p-1 text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors ml-2 flex-shrink-0"
             title="Inspect citation details"
           >
             <ExternalLink className="w-3.5 h-3.5" />
@@ -350,8 +359,8 @@ const CitationCard: React.FC<{
         )}
       </div>
       {expanded && (
-        <div className="px-3 pb-3 pt-2 border-t border-slate-800 bg-[#070b14] animate-fade-in">
-          <p className="text-xs text-slate-300 leading-relaxed font-mono">{citation.snippet}</p>
+        <div className="px-3 pb-3 pt-2 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#070b14] animate-fade-in">
+          <p className="text-xs text-slate-800 dark:text-slate-300 leading-relaxed font-mono">{citation.snippet}</p>
         </div>
       )}
     </div>
@@ -558,18 +567,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       <div className="flex-1 min-w-0">
         {/* Assistant Name Label */}
         <div className="flex items-center gap-1.5 mb-1.5 ml-1 select-none">
-          <span className="text-xs font-semibold text-slate-200">Mindora AI</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20 font-medium">Assistant</span>
+          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Mindora AI</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-500/20 font-medium">Assistant</span>
         </div>
 
         {/* Message Container Card */}
-        <div className="glass-card rounded-2xl p-4.5 border border-slate-800/80 bg-slate-900/70 shadow-sm relative backdrop-blur-md">
+        <div className="rounded-2xl p-4.5 border border-slate-200/90 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/70 shadow-md dark:shadow-sm relative backdrop-blur-md">
           <div className="prose">
             {message.content ? (
               renderMarkdown(message.content)
             ) : message.isStreaming ? (
               <div className="flex items-center gap-1.5 py-1">
-                <span className="text-xs text-slate-400">Analyzing documents</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">Analyzing documents</span>
                 <span className="cursor-blink" />
               </div>
             ) : null}
@@ -578,22 +587,22 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
           {/* Message Action Strip with Token & Similarity Telemetry */}
           {!message.isStreaming && message.content && (
-            <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-800/60 text-[11px] text-slate-500 flex-wrap">
+            <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/60 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap">
               <div className="flex items-center gap-1.5 flex-wrap">
                 {/* Redis Semantic Cache Badge */}
                 {message.isCached && (
                   <span
-                    className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono shadow-sm"
+                    className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 px-1.5 py-0.5 rounded font-mono shadow-sm"
                     title="Served instantly from Redis Semantic Cache (<15ms, $0 LLM token cost)"
                   >
-                    <Zap className="w-2.5 h-2.5 text-amber-400 fill-amber-400 animate-pulse" />
+                    <Zap className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 fill-amber-500 dark:fill-amber-400 animate-pulse" />
                     <span>⚡ Cached</span>
                   </span>
                 )}
 
                 {/* Latency */}
                 {message.responseTimeMs != null && (
-                  <span className="inline-flex items-center gap-1 text-[10px] text-teal-400 bg-teal-500/10 border border-teal-500/20 px-1.5 py-0.5 rounded font-mono">
+                  <span className="inline-flex items-center gap-1 text-[10px] text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/20 px-1.5 py-0.5 rounded font-mono">
                     <Zap className="w-2.5 h-2.5" />
                     {message.responseTimeMs}ms
                   </span>
@@ -602,7 +611,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 {/* Tokens Used */}
                 {message.totalTokens != null && (
                   <span
-                    className="inline-flex items-center gap-1 text-[10px] text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded font-mono"
+                    className="inline-flex items-center gap-1 text-[10px] text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/20 px-1.5 py-0.5 rounded font-mono"
                     title={`Prompt: ${message.promptTokens ?? 'N/A'} · Response: ${message.completionTokens ?? 'N/A'}`}
                   >
                     <Cpu className="w-2.5 h-2.5" />
@@ -616,18 +625,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                     className={clsx(
                       'inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono border',
                       message.similarityScore >= 0.8
-                        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                        ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20'
                         : message.similarityScore >= 0.68
-                        ? 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
+                        ? 'text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-500/10 border-cyan-200 dark:border-cyan-500/20'
                         : message.similarityScore >= 0.58
-                        ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-                        : 'text-amber-300 bg-amber-500/15 border-amber-500/30'
+                        ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20'
+                        : 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border-amber-200 dark:border-amber-500/30'
                     )}
                     title={message.similarityScore < 0.58 ? 'Guardrail Active: Low document similarity (<58%)' : `Hybrid Vector Match: ${(message.similarityScore * 100).toFixed(1)}%`}
                   >
                     {message.similarityScore < 0.58 ? (
                       <>
-                        <ShieldAlert className="w-2.5 h-2.5 text-amber-400" />
+                        <ShieldAlert className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
                         <span>General Mode ({(message.similarityScore * 100).toFixed(0)}%)</span>
                       </>
                     ) : (
@@ -646,8 +655,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   className={clsx(
                     'p-1.5 rounded-lg transition-colors',
                     feedback === 'like'
-                      ? 'text-teal-400 bg-teal-500/20'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                      ? 'text-teal-700 bg-teal-100 dark:text-teal-400 dark:bg-teal-500/20'
+                      : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
                   )}
                   title="Helpful response"
                 >
@@ -658,8 +667,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   className={clsx(
                     'p-1.5 rounded-lg transition-colors',
                     feedback === 'dislike'
-                      ? 'text-rose-400 bg-rose-500/20'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                      ? 'text-rose-700 bg-rose-100 dark:text-rose-400 dark:bg-rose-500/20'
+                      : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
                   )}
                   title="Unhelpful response"
                 >
@@ -669,7 +678,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 {onRegenerate && (
                   <button
                     onClick={() => onRegenerate(message)}
-                    className="flex items-center gap-1 text-slate-400 hover:text-teal-400 p-1 hover:bg-slate-800 rounded transition-colors"
+                    className="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-teal-700 dark:hover:text-teal-400 p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                     title="Regenerate answer"
                   >
                     <RotateCcw className="w-3 h-3" />
@@ -680,20 +689,20 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <button
                   onClick={handleSpeak}
                   className={clsx(
-                    'p-1 rounded transition-colors',
-                    isSpeaking ? 'text-teal-300 bg-teal-500/20 animate-pulse' : 'text-slate-500 hover:text-teal-300 hover:bg-slate-800'
+                    'p-1 rounded-lg transition-colors',
+                    isSpeaking ? 'text-teal-700 bg-teal-100 dark:text-teal-300 dark:bg-teal-500/20 animate-pulse' : 'text-slate-400 hover:text-teal-700 dark:hover:text-teal-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                   )}
                   title={isSpeaking ? 'Stop reading' : 'Read aloud'}
                 >
-                  {isSpeaking ? <VolumeX className="w-3 h-3 text-rose-400" /> : <Volume2 className="w-3 h-3" />}
+                  {isSpeaking ? <VolumeX className="w-3 h-3 text-rose-500" /> : <Volume2 className="w-3 h-3" />}
                 </button>
 
                 <button
                   onClick={handleCopy}
-                  className="flex items-center gap-1 text-slate-400 hover:text-slate-200 p-1 hover:bg-slate-800 rounded transition-colors"
+                  className="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                   title="Copy response"
                 >
-                  {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  {copied ? <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3 h-3" />}
                   <span>{copied ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>
@@ -704,7 +713,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         {/* ── Referenced Architecture Diagrams & Visuals ── */}
         {messageDiagrams.length > 0 && (
           <div className="mt-3 pl-1 space-y-2 animate-fade-in">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-cyan-400 tracking-wide uppercase">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-cyan-700 dark:text-cyan-400 tracking-wide uppercase">
               <ImageIcon className="w-3.5 h-3.5" />
               <span>Referenced Architecture Diagrams ({messageDiagrams.length})</span>
             </div>
@@ -713,9 +722,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <div
                   key={diag.id}
                   onClick={() => onOpenDiagram?.(diag)}
-                  className="group relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/90 hover:border-cyan-500/50 transition-all cursor-pointer shadow-md hover:shadow-cyan-500/10"
+                  className="group relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-cyan-400 dark:hover:border-cyan-500/50 transition-all cursor-pointer shadow-sm hover:shadow-cyan-500/10"
                 >
-                  <div className="h-32 w-full bg-slate-950/60 overflow-hidden flex items-center justify-center p-2">
+                  <div className="h-32 w-full bg-slate-50 dark:bg-slate-950/60 overflow-hidden flex items-center justify-center p-2">
                     <img
                       src={diag.imageUrl}
                       alt={diag.caption || 'Architecture Diagram'}
@@ -723,16 +732,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                       loading="lazy"
                     />
                   </div>
-                  <div className="p-2.5 border-t border-slate-800/80 bg-slate-900/90 flex items-center justify-between gap-2">
+                  <div className="p-2.5 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-900/90 flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-slate-200 truncate group-hover:text-cyan-300">
+                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-cyan-600 dark:group-hover:text-cyan-300">
                         {diag.caption || 'System Diagram'}
                       </p>
-                      <span className="text-[10px] text-slate-400">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400">
                         Page {diag.pageNumber} • {diag.documentName || 'Document'}
                       </span>
                     </div>
-                    <span className="p-1 rounded-lg bg-cyan-500/10 text-cyan-400 text-xs font-bold flex-shrink-0 group-hover:bg-cyan-500 group-hover:text-white transition-colors">
+                    <span className="p-1 rounded-lg bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 text-xs font-bold flex-shrink-0 group-hover:bg-cyan-500 group-hover:text-white transition-colors">
                       🔍
                     </span>
                   </div>
@@ -747,9 +756,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           <div className="mt-2 pl-1">
             <button
               onClick={() => setShowCitations(!showCitations)}
-              className="inline-flex items-center gap-1.5 text-xs text-teal-400 hover:text-teal-300 font-medium py-1 px-2.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/15 border border-teal-500/25 transition-all"
+              className="inline-flex items-center gap-1.5 text-xs text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 font-medium py-1 px-2.5 rounded-lg bg-teal-50 dark:bg-teal-500/10 hover:bg-teal-100 dark:hover:bg-teal-500/15 border border-teal-200 dark:border-teal-500/25 transition-all shadow-2xs"
             >
-              <FileCheck className="w-3.5 h-3.5" />
+              <FileCheck className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
               <span>{message.citations.length} verified source{message.citations.length > 1 ? 's' : ''}</span>
               {showCitations ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             </button>
@@ -767,8 +776,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         {/* Contextual Follow-Up Suggestions */}
         {!message.isStreaming && message.suggestedQuestions && message.suggestedQuestions.length > 0 && (
           <div className="mt-3.5 pl-1 flex flex-col gap-2 animate-fade-in">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-teal-400/90 tracking-wide uppercase">
-              <Sparkles className="w-3 h-3 text-teal-400 animate-pulse" />
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-teal-700 dark:text-teal-400/90 tracking-wide uppercase">
+              <Sparkles className="w-3 h-3 text-teal-600 dark:text-teal-400 animate-pulse" />
               <span>Suggested Follow-ups</span>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -776,9 +785,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <button
                   key={idx}
                   onClick={() => onSelectPrompt?.(q)}
-                  className="text-left text-xs bg-slate-900/90 hover:bg-teal-950/50 text-slate-300 hover:text-teal-200 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-teal-500/40 transition-all duration-150 flex items-center gap-2 group shadow-sm hover:shadow-teal-500/10"
+                  className="text-left text-xs bg-white dark:bg-slate-900/90 hover:bg-teal-50 dark:hover:bg-teal-950/50 text-slate-700 dark:text-slate-300 hover:text-teal-700 dark:hover:text-teal-200 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-teal-400 dark:hover:border-teal-500/40 transition-all duration-150 flex items-center gap-2 group shadow-sm"
                 >
-                  <span className="text-teal-400 text-xs group-hover:translate-x-0.5 transition-transform">✨</span>
+                  <span className="text-teal-600 dark:text-teal-400 text-xs group-hover:translate-x-0.5 transition-transform">✨</span>
                   <span className="line-clamp-1">{q}</span>
                 </button>
               ))}
@@ -796,7 +805,7 @@ const TypingIndicator = () => (
     <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-md shadow-teal-500/20 flex-shrink-0">
       <Bot className="w-4 h-4 text-white" />
     </div>
-    <div className="glass-card bg-slate-900/60 border border-slate-800 rounded-2xl px-4 py-3">
+    <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 shadow-sm">
       <div className="flex items-center gap-1 h-4">
         <div className="typing-dot" />
         <div className="typing-dot" />
@@ -1343,22 +1352,22 @@ const ChatView: React.FC = () => {
   const isBusy = isLoading || isStreaming;
 
   return (
-    <div className="flex flex-col h-full bg-[#0b0f19] relative overflow-hidden transition-colors">
+    <div className="flex flex-col h-full bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 relative overflow-hidden transition-colors">
       {/* ── Messages Container ── */}
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Modern Minimalist Hero Landing State (Only shown when chat is empty) */}
         {messages.length === 0 && (
           <div className="animate-fade-in max-w-3xl mx-auto py-8 sm:py-12 flex flex-col items-center justify-center text-center">
             {/* Animated Glowing Brand Badge */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-medium mb-4 shadow-lg shadow-teal-500/5 animate-pulse">
-              <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/30 text-teal-800 dark:text-teal-300 text-xs font-semibold mb-4 shadow-sm">
+              <Sparkles className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
               <span>Mindora AI • Document Intelligence & RAG</span>
             </div>
 
-            <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white mb-2.5 bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+            <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2.5 bg-gradient-to-r from-slate-900 via-slate-800 to-teal-800 dark:from-white dark:via-slate-100 dark:to-slate-400 bg-clip-text text-transparent">
               {currentUser?.name ? `Hello, ${currentUser.name.split(' ')[0]}!` : 'How can I assist you today?'}
             </h2>
-            <p className="text-slate-400 text-sm max-w-lg mx-auto leading-relaxed mb-6">
+            <p className="text-slate-600 dark:text-slate-400 text-sm max-w-lg mx-auto leading-relaxed mb-6 font-medium">
               {selectedDoc
                 ? `Active focus on "${selectedDoc.filename}". Query key metrics, clauses, or summaries below.`
                 : `Ask questions across your uploaded knowledge base with instant vector citations.`}
@@ -1367,19 +1376,19 @@ const ChatView: React.FC = () => {
             {/* Scoped Context Chip */}
             <div className="mb-8">
               {selectedDoc ? (
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-xs text-teal-300 shadow-sm">
-                  <FileText className="w-3.5 h-3.5 text-teal-400" />
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/30 text-xs text-teal-800 dark:text-teal-300 shadow-sm font-medium">
+                  <FileText className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                   <span>Scoped to: <strong>{selectedDoc.filename}</strong></span>
                   <button
                     onClick={() => setSelectedDocumentId(null)}
-                    className="text-teal-400 hover:text-white ml-1.5 underline text-[10px] font-semibold"
+                    className="text-teal-700 dark:text-teal-400 hover:underline ml-1.5 text-[10px] font-bold"
                   >
                     Clear
                   </button>
                 </div>
               ) : (
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-xs text-slate-400 shadow-sm">
-                  <Globe className="w-3.5 h-3.5 text-teal-400" />
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 shadow-sm font-medium">
+                  <Globe className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                   <span>Searching across <strong>all {documents.length} documents</strong> in workspace</span>
                 </div>
               )}
@@ -1387,14 +1396,14 @@ const ChatView: React.FC = () => {
 
             {/* Dynamic AI Starter Questions for Selected Document */}
             {selectedDoc && (
-              <div className="w-full mb-6 p-5 rounded-2xl bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-transparent border border-teal-500/30 animate-fade-in text-left">
+              <div className="w-full mb-6 p-5 rounded-2xl bg-teal-50/60 dark:bg-gradient-to-r dark:from-teal-500/10 dark:via-cyan-500/10 dark:to-transparent border border-teal-200 dark:border-teal-500/30 animate-fade-in text-left shadow-sm">
                 <div className="flex items-center justify-between mb-3.5">
-                  <div className="flex items-center gap-2 text-xs font-bold text-teal-300 uppercase tracking-wider">
-                    <Sparkles className="w-4 h-4 text-teal-400 animate-pulse" />
+                  <div className="flex items-center gap-2 text-xs font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider">
+                    <Sparkles className="w-4 h-4 text-teal-600 dark:text-teal-400 animate-pulse" />
                     <span>AI Suggested Starter Questions for "{selectedDoc.filename}"</span>
                   </div>
                   {isLoadingStarterPrompts && (
-                    <span className="flex items-center gap-1.5 text-[11px] text-teal-400 font-medium">
+                    <span className="flex items-center gap-1.5 text-[11px] text-teal-700 dark:text-teal-400 font-medium">
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       Analyzing document...
                     </span>
@@ -1406,12 +1415,12 @@ const ChatView: React.FC = () => {
                       <button
                         key={pIdx}
                         onClick={() => sendMessage(prompt)}
-                        className="text-left p-3.5 rounded-xl bg-slate-900/85 hover:bg-teal-950/50 border border-slate-800/80 hover:border-teal-500/50 text-xs text-slate-300 hover:text-white transition-all duration-200 group shadow-md hover:shadow-teal-500/10 hover:-translate-y-0.5"
+                        className="text-left p-3.5 rounded-xl bg-white dark:bg-slate-900/85 hover:bg-teal-50 dark:hover:bg-teal-950/50 border border-slate-200 dark:border-slate-800/80 hover:border-teal-500/50 text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all duration-200 group shadow-sm hover:shadow-teal-500/10 hover:-translate-y-0.5"
                       >
-                        <div className="flex items-center gap-1.5 text-teal-400 font-medium mb-1.5 text-[11px]">
+                        <div className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400 font-medium mb-1.5 text-[11px]">
                           <span>✨ Starter {pIdx + 1}</span>
                         </div>
-                        <p className="text-slate-300 group-hover:text-teal-200 line-clamp-2 leading-relaxed text-xs font-medium">{prompt}</p>
+                        <p className="text-slate-700 dark:text-slate-300 group-hover:text-teal-700 dark:group-hover:text-teal-200 line-clamp-2 leading-relaxed text-xs font-medium">{prompt}</p>
                       </button>
                     ))
                   ) : (
@@ -1423,12 +1432,12 @@ const ChatView: React.FC = () => {
                       <button
                         key={idx}
                         onClick={() => sendMessage(p)}
-                        className="text-left p-3.5 rounded-xl bg-slate-900/70 hover:bg-teal-950/40 border border-slate-800 hover:border-teal-500/40 text-xs text-slate-300 hover:text-white transition-all duration-200 group hover:-translate-y-0.5"
+                        className="text-left p-3.5 rounded-xl bg-white dark:bg-slate-900/70 hover:bg-teal-50 dark:hover:bg-teal-950/40 border border-slate-200 dark:border-slate-800 hover:border-teal-500/40 text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all duration-200 group hover:-translate-y-0.5 shadow-sm"
                       >
-                        <div className="flex items-center gap-1.5 text-teal-400 font-medium mb-1.5 text-[11px]">
+                        <div className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400 font-medium mb-1.5 text-[11px]">
                           <span>✨ Starter {idx + 1}</span>
                         </div>
-                        <p className="text-slate-300 group-hover:text-teal-200 line-clamp-2 leading-relaxed text-xs">{p}</p>
+                        <p className="text-slate-700 dark:text-slate-300 group-hover:text-teal-700 dark:group-hover:text-teal-200 line-clamp-2 leading-relaxed text-xs">{p}</p>
                       </button>
                     ))
                   )}
@@ -1437,28 +1446,40 @@ const ChatView: React.FC = () => {
             )}
 
             {/* Prompt Template Cards */}
-            <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-3.5 text-left">
+            <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
               {PROMPT_TEMPLATES.map((cat) => (
                 <div
                   key={cat.category}
                   className={clsx(
-                    'rounded-2xl border bg-slate-900/50 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg',
+                    'rounded-3xl border bg-white dark:bg-slate-900/60 p-4 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl shadow-sm space-y-3',
                     cat.border
                   )}
                 >
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-base">{cat.icon}</span>
-                    <h3 className={clsx('text-xs font-bold uppercase tracking-wider', cat.accent)}>{cat.category}</h3>
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800/80">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{cat.icon}</span>
+                      <h3 className={clsx('text-xs font-extrabold uppercase tracking-wider', cat.accent)}>{cat.category}</h3>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     {cat.templates.map((t) => (
                       <button
                         key={t.label}
                         onClick={() => sendMessage(t.prompt)}
-                        className="w-full text-left p-2.5 rounded-xl bg-slate-800/40 hover:bg-teal-500/10 border border-slate-800/80 hover:border-teal-500/40 transition-all text-xs text-slate-300 hover:text-white group"
+                        className={clsx(
+                          'w-full text-left p-3 rounded-2xl bg-slate-50/90 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800/80 transition-all text-xs group shadow-2xs hover:shadow-sm',
+                          cat.itemHover
+                        )}
                       >
-                        <span className="font-medium block text-slate-200 group-hover:text-teal-300 transition-colors mb-0.5">{t.label}</span>
-                        <span className="text-slate-500 text-[11px] line-clamp-1 group-hover:text-slate-400">{t.prompt}</span>
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <span className={clsx('font-bold block text-slate-800 dark:text-slate-200 transition-colors', cat.itemTitleHover)}>
+                            {t.label}
+                          </span>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                        </div>
+                        <span className="text-slate-500 dark:text-slate-400 text-[11px] line-clamp-1 leading-snug">
+                          {t.prompt}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -1491,11 +1512,11 @@ const ChatView: React.FC = () => {
       </div>
 
       {/* ── Floating Capsule Input Dock ── */}
-      <div className="p-4 bg-gradient-to-t from-[#0b0f19] via-[#0b0f19]/90 to-transparent flex-shrink-0">
+      <div className="p-4 bg-gradient-to-t from-slate-50 via-slate-50/90 dark:from-[#0b0f19] dark:via-[#0b0f19]/90 to-transparent flex-shrink-0">
         <div className="max-w-3xl mx-auto">
-          <div className="glass-input rounded-3xl p-3 border border-slate-700/60 shadow-2xl shadow-black/40">
+          <div className="bg-white/95 dark:bg-[#0f172a]/95 rounded-3xl p-3 border border-slate-200 dark:border-slate-700/60 shadow-xl dark:shadow-2xl shadow-black/5 dark:shadow-black/40 backdrop-blur-xl">
             {/* Mini Toolbar */}
-            <div className="flex items-center justify-between pb-2 px-1 text-xs text-slate-400 border-b border-slate-800/60 mb-2 flex-wrap gap-2">
+            <div className="flex items-center justify-between pb-2 px-1 text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800/60 mb-2 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 {/* Multi-Document Scope Selector Pill */}
                 <div className="relative">
@@ -1615,34 +1636,34 @@ const ChatView: React.FC = () => {
                 <button
                   onClick={() => setStreamingMode(!streamingMode)}
                   className={clsx(
-                    'flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md transition-all',
+                    'flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg transition-all font-semibold',
                     streamingMode
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                      : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   )}
                   title="Toggle streaming response"
                 >
-                  <Zap className="w-3 h-3" />
+                  <Zap className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                   <span>{streamingMode ? 'Streaming' : 'Batch'}</span>
                 </button>
 
                 {/* Analytics & Graph Button */}
                 <button
                   onClick={() => setIsAnalyticsOpen(true)}
-                  className="flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-md bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 border border-teal-500/20 transition-all font-medium"
+                  className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 dark:bg-teal-500/10 dark:text-teal-400 dark:hover:bg-teal-500/20 dark:border-teal-500/20 transition-all font-semibold shadow-2xs"
                   title="View Token Usage & Similarity Graphs"
                 >
-                  <BarChart3 className="w-3 h-3 text-teal-400" />
+                  <BarChart3 className="w-3 h-3 text-teal-600 dark:text-teal-400" />
                   <span>Analytics & Graph</span>
                 </button>
 
                 {/* Quiz & Flashcards Hub Button */}
                 <button
                   onClick={() => setActiveTab('study')}
-                  className="flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/20 transition-all font-medium"
+                  className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 dark:bg-fuchsia-500/10 dark:text-fuchsia-400 dark:hover:bg-fuchsia-500/20 dark:border-fuchsia-500/20 transition-all font-semibold shadow-2xs"
                   title="Generate interactive quiz or study flashcards for scoped document(s)"
                 >
-                  <GraduationCap className="w-3 h-3 text-cyan-400" />
+                  <GraduationCap className="w-3.5 h-3.5 text-fuchsia-600 dark:text-fuchsia-400" />
                   <span>Quiz & Study</span>
                 </button>
               </div>
@@ -1654,24 +1675,24 @@ const ChatView: React.FC = () => {
                   <div className="relative">
                     <button
                       onClick={() => setShowExportMenu(!showExportMenu)}
-                      className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition-all font-medium"
+                      className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all font-medium"
                       title="Export chat transcript"
                     >
-                      <Download className="w-3 h-3 text-cyan-400" />
+                      <Download className="w-3 h-3 text-teal-600 dark:text-cyan-400" />
                       <span>Export</span>
                       <ChevronDown className="w-2.5 h-2.5 opacity-60" />
                     </button>
 
                     {showExportMenu && (
-                      <div className="absolute right-0 bottom-full mb-1.5 w-44 bg-[#0f172a] border border-slate-700/80 rounded-xl shadow-xl py-1 z-30 animate-fade-in glass-panel">
+                      <div className="absolute right-0 bottom-full mb-1.5 w-44 bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-700/80 rounded-xl shadow-xl py-1 z-30 animate-fade-in glass-panel">
                         <button
                           onClick={() => {
                             exportAsMarkdown();
                             setShowExportMenu(false);
                           }}
-                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-teal-500/15 text-left transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-teal-500/15 text-left transition-colors"
                         >
-                          <FileText className="w-3.5 h-3.5 text-teal-400" />
+                          <FileText className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                           <span>Markdown (.md)</span>
                         </button>
                         <button
@@ -1679,9 +1700,9 @@ const ChatView: React.FC = () => {
                             exportAsJson();
                             setShowExportMenu(false);
                           }}
-                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-cyan-500/15 text-left transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-cyan-500/15 text-left transition-colors"
                         >
-                          <FileCode className="w-3.5 h-3.5 text-cyan-400" />
+                          <FileCode className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
                           <span>JSON (.json)</span>
                         </button>
                       </div>
@@ -1693,7 +1714,7 @@ const ChatView: React.FC = () => {
                 {messages.length > 1 && (
                   <button
                     onClick={clearChat}
-                    className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 p-0.5 hover:bg-slate-800 rounded transition-colors"
+                    className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                     title="Start new conversation"
                   >
                     <RotateCcw className="w-3 h-3" />
@@ -1726,7 +1747,7 @@ const ChatView: React.FC = () => {
                 }
                 rows={1}
                 disabled={isBusy}
-                className="flex-1 bg-transparent text-sm text-slate-100 placeholder-slate-500 resize-none outline-none leading-relaxed disabled:opacity-60 max-h-32"
+                className="flex-1 bg-transparent text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 resize-none outline-none leading-relaxed disabled:opacity-60 max-h-32"
                 style={{ minHeight: '26px' }}
                 onInput={(e) => {
                   const t = e.currentTarget;
@@ -1743,19 +1764,19 @@ const ChatView: React.FC = () => {
                 className={clsx(
                   'flex-shrink-0 p-2.5 rounded-full transition-all duration-200',
                   isListening
-                    ? 'bg-rose-500/25 text-rose-400 border border-rose-500/50 animate-pulse ring-2 ring-rose-500/40 shadow-lg shadow-rose-500/20'
-                    : 'text-slate-400 hover:text-teal-300 hover:bg-slate-800'
+                    ? 'bg-rose-500/25 text-rose-500 border border-rose-500/50 animate-pulse ring-2 ring-rose-500/40 shadow-lg shadow-rose-500/20'
+                    : 'text-slate-400 hover:text-teal-600 dark:hover:text-teal-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                 )}
                 title={isListening ? 'Stop listening' : 'Voice input (Speech to Text)'}
               >
-                {isListening ? <MicOff className="w-4 h-4 text-rose-400" /> : <Mic className="w-4 h-4" />}
+                {isListening ? <MicOff className="w-4 h-4 text-rose-500" /> : <Mic className="w-4 h-4" />}
               </button>
 
               {/* Action Button */}
               {isStreaming ? (
                 <button
                   onClick={stopStream}
-                  className="flex-shrink-0 p-2.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-rose-400 rounded-full transition-all"
+                  className="flex-shrink-0 p-2.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-rose-500 rounded-full transition-all"
                   title="Stop generation"
                 >
                   <Square className="w-4 h-4 fill-current" />

@@ -86,6 +86,19 @@ public class DocumentController {
                                                 .build());
         }
 
+        @GetMapping("/{id}/chunks")
+        @Operation(summary = "Get all vector text chunks for a document")
+        public ResponseEntity<ApiResponse<List<com.substring.docmind.dto.DocumentChunkDto>>> getDocumentChunks(@PathVariable UUID id) {
+                List<com.substring.docmind.dto.DocumentChunkDto> chunks = documentService.getDocumentChunks(id);
+                return ResponseEntity.ok(
+                                ApiResponse.<List<com.substring.docmind.dto.DocumentChunkDto>>builder()
+                                                .message("Document chunks retrieved successfully")
+                                                .success(true)
+                                                .timestamp(LocalDateTime.now())
+                                                .data(chunks)
+                                                .build());
+        }
+
         @DeleteMapping("/{id}")
         @Operation(summary = "Delete a document and purge its vector embeddings from vector store")
         public ResponseEntity<ApiResponse<Void>> deleteDocument(@PathVariable UUID id) {

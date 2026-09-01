@@ -26,6 +26,7 @@ public class ProjectConfig {
                                                 4. Tone & Format: Always be warm, professional, clear, and structured. Use Markdown (headings, bullet points, bold text, code blocks) to make responses easy to read.
                                          
                         """)
+                .defaultAdvisors(new org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor())
                 .build();
     }
 

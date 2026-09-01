@@ -23,6 +23,7 @@ import type {
   MindMapResponseDto,
   MindMapGenerationRequestDto,
   DocumentDiagramDto,
+  DocumentChunkDto,
   TokenAnalyticsDto,
 } from '../types';
 
@@ -122,6 +123,11 @@ export const documentApi = {
 
   getById: async (id: string): Promise<ApiResponse<DocumentMetadataDto>> => {
     const { data } = await api.get<ApiResponse<DocumentMetadataDto>>(`/documents/${id}`);
+    return data;
+  },
+
+  getChunks: async (id: string): Promise<ApiResponse<DocumentChunkDto[]>> => {
+    const { data } = await api.get<ApiResponse<DocumentChunkDto[]>>(`/documents/${id}/chunks`);
     return data;
   },
 

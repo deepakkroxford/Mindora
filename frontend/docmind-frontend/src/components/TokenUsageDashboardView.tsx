@@ -184,9 +184,9 @@ const TokenUsageDashboardView: React.FC = () => {
   const pieData = useMemo(() => {
     if (!data?.categoryBreakdown) return [];
     return [
-      { name: 'Chat Assistant', key: 'CHAT', value: data.categoryBreakdown['CHAT']?.totalTokens || 0, color: '#06b6d4' },
+      { name: 'Chat Assistant', key: 'CHAT', value: data.categoryBreakdown['CHAT']?.totalTokens || 0, color: '#0ea5e9' },
       { name: 'Concept Mind Map', key: 'MINDMAP', value: data.categoryBreakdown['MINDMAP']?.totalTokens || 0, color: '#f59e0b' },
-      { name: 'Quiz & Study', key: 'QUIZ', value: data.categoryBreakdown['QUIZ']?.totalTokens || 0, color: '#a855f7' }
+      { name: 'Quiz & Study', key: 'QUIZ', value: data.categoryBreakdown['QUIZ']?.totalTokens || 0, color: '#d946ef' }
     ].filter(item => item.value > 0);
   }, [data]);
 
@@ -195,11 +195,11 @@ const TokenUsageDashboardView: React.FC = () => {
       key: 'CHAT',
       label: 'Chat Assistant RAG',
       icon: MessageSquare,
-      color: 'from-cyan-500 to-blue-500',
-      textColor: 'text-cyan-400',
-      bgColor: 'bg-cyan-500/10 border-cyan-500/30',
-      glowColor: 'shadow-cyan-500/20',
-      strokeColor: '#06b6d4',
+      color: 'from-sky-500 to-blue-600',
+      textColor: 'text-sky-400',
+      bgColor: 'bg-sky-500/10 border-sky-500/30',
+      glowColor: 'shadow-sky-500/20',
+      strokeColor: '#0ea5e9',
       desc: 'Context chunk embeddings + streamed generative responses'
     },
     {
@@ -217,11 +217,11 @@ const TokenUsageDashboardView: React.FC = () => {
       key: 'QUIZ',
       label: 'Quiz & Study Hub',
       icon: GraduationCap,
-      color: 'from-purple-500 to-indigo-500',
-      textColor: 'text-purple-400',
-      bgColor: 'bg-purple-500/10 border-purple-500/30',
-      glowColor: 'shadow-purple-500/20',
-      strokeColor: '#a855f7',
+      color: 'from-fuchsia-500 to-purple-600',
+      textColor: 'text-fuchsia-400',
+      bgColor: 'bg-fuchsia-500/10 border-fuchsia-500/30',
+      glowColor: 'shadow-fuchsia-500/20',
+      strokeColor: '#d946ef',
       desc: 'Active-recall question generation & 3D flashcard decks'
     }
   ];
@@ -524,25 +524,25 @@ const TokenUsageDashboardView: React.FC = () => {
                     <AreaChart data={data.dailyUsage} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <defs>
                         <linearGradient id="chatGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.6}/>
-                          <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0}/>
+                          <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.6}/>
+                          <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.0}/>
                         </linearGradient>
                         <linearGradient id="mindMapGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.6}/>
                           <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0}/>
                         </linearGradient>
                         <linearGradient id="quizGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#a855f7" stopOpacity={0.6}/>
-                          <stop offset="95%" stopColor="#a855f7" stopOpacity={0.0}/>
+                          <stop offset="5%" stopColor="#d946ef" stopOpacity={0.6}/>
+                          <stop offset="95%" stopColor="#d946ef" stopOpacity={0.0}/>
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.5} />
                       <XAxis dataKey="date" stroke="#64748b" tick={{ fontSize: 11 }} tickFormatter={(val: string) => val.slice(5)} />
                       <YAxis stroke="#64748b" tick={{ fontSize: 11 }} tickFormatter={(val: number) => formatNumber(val)} />
                       <Tooltip content={<CustomChartTooltip />} />
-                      <Area type="monotone" dataKey="chatTokens" name="Chat Assistant" stroke="#06b6d4" strokeWidth={2.5} fillOpacity={1} fill="url(#chatGrad)" stackId="1" />
+                      <Area type="monotone" dataKey="chatTokens" name="Chat Assistant" stroke="#0ea5e9" strokeWidth={2.5} fillOpacity={1} fill="url(#chatGrad)" stackId="1" />
                       <Area type="monotone" dataKey="mindMapTokens" name="Mind Map" stroke="#f59e0b" strokeWidth={2.5} fillOpacity={1} fill="url(#mindMapGrad)" stackId="1" />
-                      <Area type="monotone" dataKey="quizTokens" name="Quiz & Study" stroke="#a855f7" strokeWidth={2.5} fillOpacity={1} fill="url(#quizGrad)" stackId="1" />
+                      <Area type="monotone" dataKey="quizTokens" name="Quiz & Study" stroke="#d946ef" strokeWidth={2.5} fillOpacity={1} fill="url(#quizGrad)" stackId="1" />
                     </AreaChart>
                   ) : chartType === 'bar' ? (
                     <BarChart data={data.dailyUsage} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -550,9 +550,9 @@ const TokenUsageDashboardView: React.FC = () => {
                       <XAxis dataKey="date" stroke="#64748b" tick={{ fontSize: 11 }} tickFormatter={(val: string) => val.slice(5)} />
                       <YAxis stroke="#64748b" tick={{ fontSize: 11 }} tickFormatter={(val: number) => formatNumber(val)} />
                       <Tooltip content={<CustomChartTooltip />} />
-                      <Bar dataKey="chatTokens" name="Chat Assistant" fill="#06b6d4" stackId="a" radius={[0, 0, 4, 4]} />
+                      <Bar dataKey="chatTokens" name="Chat Assistant" fill="#0ea5e9" stackId="a" radius={[0, 0, 4, 4]} />
                       <Bar dataKey="mindMapTokens" name="Mind Map" fill="#f59e0b" stackId="a" />
-                      <Bar dataKey="quizTokens" name="Quiz & Study" fill="#a855f7" stackId="a" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="quizTokens" name="Quiz & Study" fill="#d946ef" stackId="a" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   ) : (
                     <LineChart data={data.dailyUsage} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -560,9 +560,9 @@ const TokenUsageDashboardView: React.FC = () => {
                       <XAxis dataKey="date" stroke="#64748b" tick={{ fontSize: 11 }} tickFormatter={(val: string) => val.slice(5)} />
                       <YAxis stroke="#64748b" tick={{ fontSize: 11 }} tickFormatter={(val: number) => formatNumber(val)} />
                       <Tooltip content={<CustomChartTooltip />} />
-                      <Line type="monotone" dataKey="chatTokens" name="Chat Assistant" stroke="#06b6d4" strokeWidth={2.5} dot={false} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="chatTokens" name="Chat Assistant" stroke="#0ea5e9" strokeWidth={2.5} dot={false} activeDot={{ r: 6 }} />
                       <Line type="monotone" dataKey="mindMapTokens" name="Mind Map" stroke="#f59e0b" strokeWidth={2.5} dot={false} activeDot={{ r: 6 }} />
-                      <Line type="monotone" dataKey="quizTokens" name="Quiz & Study" stroke="#a855f7" strokeWidth={2.5} dot={false} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="quizTokens" name="Quiz & Study" stroke="#d946ef" strokeWidth={2.5} dot={false} activeDot={{ r: 6 }} />
                     </LineChart>
                   )}
                 </ResponsiveContainer>
@@ -576,16 +576,16 @@ const TokenUsageDashboardView: React.FC = () => {
             {/* Custom Legend */}
             <div className="flex items-center justify-center gap-6 pt-3 border-t border-slate-100 dark:border-slate-800/80 text-xs font-medium">
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-cyan-500 shadow-sm shadow-cyan-500/50" />
-                <span className="text-slate-700 dark:text-slate-300">Chat Assistant (Cyan)</span>
+                <span className="w-3 h-3 rounded-full bg-sky-500 shadow-sm shadow-sky-500/50" />
+                <span className="text-slate-700 dark:text-slate-300">Chat Assistant (Sky Blue)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50" />
-                <span className="text-slate-700 dark:text-slate-300">Mind Map (Amber)</span>
+                <span className="text-slate-700 dark:text-slate-300">Mind Map (Amber Gold)</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-purple-500 shadow-sm shadow-purple-500/50" />
-                <span className="text-slate-700 dark:text-slate-300">Quiz & Study Hub (Purple)</span>
+                <span className="w-3 h-3 rounded-full bg-fuchsia-500 shadow-sm shadow-fuchsia-500/50" />
+                <span className="text-slate-700 dark:text-slate-300">Quiz & Study Hub (Fuchsia / Purple)</span>
               </div>
             </div>
           </div>
@@ -739,19 +739,24 @@ const TokenUsageDashboardView: React.FC = () => {
             {/* Filter and Search Bar */}
             <div className="flex items-center gap-2 flex-wrap">
               {/* Category Pill Filter */}
-              <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 border border-slate-200 dark:border-slate-700 text-xs">
-                {['ALL', 'CHAT', 'MINDMAP', 'QUIZ'].map(cat => (
+              <div className="flex items-center bg-slate-100 dark:bg-slate-850 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1">
+                {[
+                  { key: 'ALL', label: 'ALL', activeClass: 'bg-slate-700 text-white shadow-sm' },
+                  { key: 'CHAT', label: 'CHAT', activeClass: 'bg-sky-600 text-white shadow-md shadow-sky-600/30' },
+                  { key: 'MINDMAP', label: 'MINDMAP', activeClass: 'bg-amber-600 text-white shadow-md shadow-amber-600/30' },
+                  { key: 'QUIZ', label: 'QUIZ', activeClass: 'bg-fuchsia-600 text-white shadow-md shadow-fuchsia-600/30' }
+                ].map(cat => (
                   <button
-                    key={cat}
-                    onClick={() => setSelectedCategoryFilter(cat)}
+                    key={cat.key}
+                    onClick={() => setSelectedCategoryFilter(cat.key)}
                     className={clsx(
-                      'px-3 py-1 rounded-lg font-medium transition-all text-xs',
-                      selectedCategoryFilter === cat
-                        ? 'bg-cyan-600 text-white font-semibold shadow-sm'
+                      'px-3 py-1 rounded-lg font-medium transition-all text-xs font-mono',
+                      selectedCategoryFilter === cat.key
+                        ? cat.activeClass
                         : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     )}
                   >
-                    {cat}
+                    {cat.label}
                   </button>
                 ))}
               </div>
@@ -800,10 +805,10 @@ const TokenUsageDashboardView: React.FC = () => {
                         <td className="p-3.5 whitespace-nowrap">
                           <span
                             className={clsx(
-                              'px-2.5 py-0.5 rounded-full font-bold text-[10px] border',
-                              isChat && 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30 shadow-sm shadow-cyan-500/10',
-                              isMindMap && 'bg-amber-500/10 text-amber-400 border-amber-500/30 shadow-sm shadow-amber-500/10',
-                              isQuiz && 'bg-purple-500/10 text-purple-400 border-purple-500/30 shadow-sm shadow-purple-500/10',
+                              'px-2.5 py-0.5 rounded-full font-bold text-[10px] border tracking-wider font-mono uppercase',
+                              isChat && 'bg-sky-500/15 text-sky-400 border-sky-500/40 shadow-sm shadow-sky-500/20',
+                              isMindMap && 'bg-amber-500/15 text-amber-400 border-amber-500/40 shadow-sm shadow-amber-500/20',
+                              isQuiz && 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/50 shadow-sm shadow-fuchsia-500/25',
                               !isChat && !isMindMap && !isQuiz && 'bg-slate-500/10 text-slate-400 border-slate-500/30'
                             )}
                           >

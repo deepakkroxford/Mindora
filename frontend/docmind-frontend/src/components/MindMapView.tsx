@@ -567,12 +567,12 @@ export const MindMapView: React.FC = () => {
             className={clsx(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shadow-sm',
               isDocSidebarOpen
-                ? 'bg-teal-500/20 text-teal-300 border-teal-500/40 shadow-teal-500/10'
+                ? 'bg-teal-50 text-teal-700 border-teal-300 dark:bg-teal-500/20 dark:text-teal-300 dark:border-teal-500/40 shadow-teal-500/10'
                 : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
             )}
             title="Toggle Scope Documents Sidebar"
           >
-            {isDocSidebarOpen ? <PanelLeftClose className="w-3.5 h-3.5 text-teal-400" /> : <PanelLeftOpen className="w-3.5 h-3.5 text-teal-400" />}
+            {isDocSidebarOpen ? <PanelLeftClose className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" /> : <PanelLeftOpen className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />}
             <span>Scope ({selectedDocumentIds.length})</span>
           </button>
 
@@ -581,7 +581,7 @@ export const MindMapView: React.FC = () => {
             onClick={() => setShowSavedModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all shadow-sm"
           >
-            <FolderOpen className="w-3.5 h-3.5 text-teal-400" />
+            <FolderOpen className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
             <span>Vault ({savedMindMaps.length})</span>
           </button>
 
@@ -594,7 +594,7 @@ export const MindMapView: React.FC = () => {
                 'flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm active:scale-95',
                 hasUnsavedChanges
                   ? 'bg-gradient-to-r from-amber-600 to-amber-500 text-white border-amber-400/50 shadow-amber-500/20 animate-pulse'
-                  : 'bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border-teal-500/30'
+                  : 'bg-teal-50 hover:bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-500/10 dark:hover:bg-teal-500/20 dark:text-teal-300 dark:border-teal-500/30'
               )}
               title="Save current knowledge graph to PostgreSQL Vault"
             >
@@ -608,10 +608,10 @@ export const MindMapView: React.FC = () => {
             <button
               onClick={() => setLayoutDirection('LR')}
               className={clsx(
-                'px-2.5 py-1 rounded-lg font-medium transition-all text-xs flex items-center gap-1',
+                'px-2.5 py-1 rounded-lg transition-all text-xs flex items-center gap-1',
                 layoutDirection === 'LR'
-                  ? 'bg-teal-600 text-white font-semibold shadow-sm'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-teal-600 text-white font-bold shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
               )}
               title="Horizontal Tree Layout (Left to Right)"
             >
@@ -621,10 +621,10 @@ export const MindMapView: React.FC = () => {
             <button
               onClick={() => setLayoutDirection('TB')}
               className={clsx(
-                'px-2.5 py-1 rounded-lg font-medium transition-all text-xs flex items-center gap-1',
+                'px-2.5 py-1 rounded-lg transition-all text-xs flex items-center gap-1',
                 layoutDirection === 'TB'
-                  ? 'bg-teal-600 text-white font-semibold shadow-sm'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-teal-600 text-white font-bold shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
               )}
               title="Vertical Tree Layout (Top to Bottom)"
             >
@@ -634,17 +634,17 @@ export const MindMapView: React.FC = () => {
           </div>
 
           {/* Depth Selector */}
-          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 px-3 py-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-            <Layers className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-slate-500 dark:text-slate-400 font-medium">Depth:</span>
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+            <Layers className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+            <span className="text-slate-600 dark:text-slate-400 font-medium">Depth:</span>
             <select
               value={maxDepth}
               onChange={(e) => setMaxDepth(Number(e.target.value))}
-              className="bg-transparent font-bold text-teal-600 dark:text-teal-400 outline-none cursor-pointer"
+              className="bg-transparent font-bold text-teal-700 dark:text-teal-400 outline-none cursor-pointer"
             >
-              <option value={2} className="bg-slate-900 text-white">2 (Macro)</option>
-              <option value={3} className="bg-slate-900 text-white">3 (Standard)</option>
-              <option value={4} className="bg-slate-900 text-white">4 (Deep Graph)</option>
+              <option value={2} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">2 (Macro)</option>
+              <option value={3} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">3 (Standard)</option>
+              <option value={4} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">4 (Deep Graph)</option>
             </select>
           </div>
 
@@ -652,7 +652,7 @@ export const MindMapView: React.FC = () => {
           <button
             onClick={handleGenerateMindMap}
             disabled={isLoading || selectedDocumentIds.length === 0}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 via-cyan-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-teal-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white text-xs font-bold shadow-md shadow-teal-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
           >
             <Sparkles className={clsx('w-4 h-4', isLoading && 'animate-spin')} />
             <span>{isLoading ? 'Synthesizing...' : 'Generate Graph'}</span>
@@ -663,34 +663,34 @@ export const MindMapView: React.FC = () => {
             <div className="relative">
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
-                className="p-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 transition-all shadow-sm"
+                className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 transition-all shadow-sm"
                 title="Export Knowledge Graph"
               >
-                <Download className="w-4 h-4 text-teal-400" />
+                <Download className="w-4 h-4 text-teal-600 dark:text-teal-400" />
               </button>
 
               {showExportMenu && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setShowExportMenu(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-[#0f172a]/95 border border-slate-700/80 shadow-2xl backdrop-blur-xl p-2 z-30 space-y-1 animate-fade-in text-xs">
+                  <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-white dark:bg-[#0f172a]/95 border border-slate-200 dark:border-slate-700/80 shadow-2xl backdrop-blur-xl p-2 z-30 space-y-1 animate-fade-in text-xs">
                     <button
                       onClick={handleExportPng}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-slate-200 hover:bg-slate-800 transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                     >
-                      <ImageIcon className="w-4 h-4 text-teal-400" />
+                      <ImageIcon className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                       <div>
-                        <div className="font-semibold text-white">Export High-Res PNG</div>
-                        <div className="text-[10px] text-slate-400">Full 2x canvas snapshot</div>
+                        <div className="font-semibold text-slate-900 dark:text-white">Export High-Res PNG</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">Full 2x canvas snapshot</div>
                       </div>
                     </button>
                     <button
                       onClick={handleExportMarkdown}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-slate-200 hover:bg-slate-800 transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                     >
-                      <Code className="w-4 h-4 text-cyan-400" />
+                      <Code className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
                       <div>
-                        <div className="font-semibold text-white">Export Markdown Outline</div>
-                        <div className="text-[10px] text-slate-400">Hierarchical taxonomy tree</div>
+                        <div className="font-semibold text-slate-900 dark:text-white">Export Markdown Outline</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">Hierarchical taxonomy tree</div>
                       </div>
                     </button>
                   </div>
@@ -782,7 +782,7 @@ export const MindMapView: React.FC = () => {
         )}
 
         {/* ── React Flow Interactive Canvas ── */}
-        <div ref={reactFlowWrapper} className="flex-1 h-full w-full relative bg-[#070b14]">
+        <div ref={reactFlowWrapper} className="flex-1 h-full w-full relative bg-slate-100 dark:bg-[#070b14] transition-colors">
           {nodes.length > 0 ? (
             <ReactFlow
               nodes={nodes}
@@ -794,19 +794,18 @@ export const MindMapView: React.FC = () => {
               minZoom={0.2}
               maxZoom={2.5}
               proOptions={{ hideAttribution: true }}
-              className="dark"
             >
-              <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} color="#1e293b" />
-              <Controls className="!bg-[#0f172a]/90 !border-slate-700 !shadow-xl !rounded-2xl !p-1 !text-slate-200" />
+              <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} color="#64748b" />
+              <Controls className="!bg-white/90 dark:!bg-[#0f172a]/90 !border-slate-200 dark:!border-slate-700 !shadow-xl !rounded-2xl !p-1 text-slate-800 dark:!text-slate-200" />
               <MiniMap
                 nodeColor={(n) => (n.data?.isRoot ? '#14b8a6' : '#06b6d4')}
-                maskColor="rgba(7, 11, 20, 0.75)"
-                className="!bg-[#0d1424]/90 !border !border-slate-800 !rounded-2xl !shadow-2xl overflow-hidden"
+                maskColor="rgba(7, 11, 20, 0.5)"
+                className="!bg-white/90 dark:!bg-[#0d1424]/90 !border !border-slate-200 dark:!border-slate-800 !rounded-2xl !shadow-2xl overflow-hidden"
               />
 
               {/* Top-Right Canvas Info Overlay */}
-              <Panel position="top-right" className="bg-[#0f172a]/80 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-800 text-[11px] text-slate-400 font-mono space-y-0.5 shadow-lg">
-                <div className="flex items-center gap-2 text-teal-400 font-bold">
+              <Panel position="top-right" className="bg-white/90 dark:bg-[#0f172a]/80 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400 font-mono space-y-0.5 shadow-lg">
+                <div className="flex items-center gap-2 text-teal-600 dark:text-teal-400 font-bold">
                   <Compass className="w-3.5 h-3.5" />
                   <span>Interactive Node Canvas</span>
                 </div>
