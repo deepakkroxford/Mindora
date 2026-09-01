@@ -33,14 +33,14 @@ const ProtectedLayout: React.FC = () => {
   }, [fetchDocuments, fetchConversations]);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#0b0f19] text-slate-100">
+    <div className="flex flex-col h-screen overflow-hidden bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 transition-colors duration-200">
       <Navbar onUploadClick={() => setIsUploadOpen(true)} />
 
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar onUploadClick={() => setIsUploadOpen(true)} />
 
         {/* Main content */}
-        <main className="flex-1 overflow-hidden relative flex flex-col min-w-0 bg-[#0b0f19]">
+        <main className="flex-1 overflow-hidden relative flex flex-col min-w-0 bg-slate-50 dark:bg-[#0b0f19] transition-colors duration-200">
           {activeTab === 'chat' && <ChatView />}
           {activeTab === 'search' && <SearchView />}
           {activeTab === 'chunks' && <ChunksView />}

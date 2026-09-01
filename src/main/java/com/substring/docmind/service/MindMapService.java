@@ -139,16 +139,32 @@ public class MindMapService {
                 combinedContext
         );
 
-        int promptTokens = Math.max(prompt.length() / 4, 80);
-
         try {
-            String aiResponse = chatClient.prompt()
+            var chatResponse = chatClient.prompt()
                     .user(prompt)
                     .call()
-                    .content();
+                    .chatResponse();
 
-            int completionTokens = Math.max(aiResponse.length() / 4, 80);
-            int totalTokensUsed = promptTokens + completionTokens;
+            String aiResponse = chatResponse != null && chatResponse.getResult() != null
+                    && chatResponse.getResult().getOutput() != null
+                            ? chatResponse.getResult().getOutput().getText()
+                            : "";
+
+            int promptTokens = 0;
+            int completionTokens = 0;
+            if (chatResponse != null && chatResponse.getMetadata() != null
+                    && chatResponse.getMetadata().getUsage() != null) {
+                var usage = chatResponse.getMetadata().getUsage();
+                if (usage.getPromptTokens() != null) {
+                    promptTokens = usage.getPromptTokens().intValue();
+                }
+                if (usage.getCompletionTokens() != null) {
+                    completionTokens = usage.getCompletionTokens().intValue();
+                }
+            }
+            int totalTokensUsed = (promptTokens + completionTokens > 0)
+                    ? (promptTokens + completionTokens)
+                    : (Math.max(prompt.length() / 4, 80) + Math.max(aiResponse.length() / 4, 80));
 
             String cleanJson = sanitizeJson(aiResponse);
             MindMapNodeDto rootNode = objectMapper.readValue(cleanJson, MindMapNodeDto.class);

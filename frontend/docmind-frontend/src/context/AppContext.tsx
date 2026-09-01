@@ -25,6 +25,8 @@ interface AppContextType {
   fetchConversations: () => Promise<ConversationDto[]>;
   deleteConversation: (id: string) => Promise<void>;
   renameConversation: (id: string, newTitle: string) => Promise<boolean>;
+  inspectingDocument: DocumentMetadataDto | null;
+  setInspectingDocument: (doc: DocumentMetadataDto | null) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -35,6 +37,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'search' | 'chunks' | 'guide' | 'study' | 'mindmap' | 'tokens'>('chat');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [inspectingDocument, setInspectingDocument] = useState<DocumentMetadataDto | null>(null);
 
   const [conversations, setConversations] = useState<ConversationDto[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -160,6 +163,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fetchConversations,
         deleteConversation,
         renameConversation,
+        inspectingDocument,
+        setInspectingDocument,
       }}
     >
       {children}

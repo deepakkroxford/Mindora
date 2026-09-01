@@ -120,15 +120,33 @@ public class StudyDeckService {
                     ]
                     """.formatted(count, difficulty, context);
 
-            var response = chatClient.prompt().user(prompt).call().content();
+            var chatResponse = chatClient.prompt().user(prompt).call().chatResponse();
+            String response = chatResponse != null && chatResponse.getResult() != null
+                    && chatResponse.getResult().getOutput() != null
+                            ? chatResponse.getResult().getOutput().getText()
+                            : "";
             List<QuizQuestionDto> questions = parseQuizQuestions(response);
 
             if (questions.isEmpty()) {
                 return getFallbackQuiz(docNames, difficulty);
             }
 
-            int promptTokens = Math.max(prompt.length() / 4, 100);
-            int completionTokens = Math.max(response.length() / 4, 100);
+            int promptTokens = 0;
+            int completionTokens = 0;
+            if (chatResponse != null && chatResponse.getMetadata() != null
+                    && chatResponse.getMetadata().getUsage() != null) {
+                var usage = chatResponse.getMetadata().getUsage();
+                if (usage.getPromptTokens() != null) {
+                    promptTokens = usage.getPromptTokens().intValue();
+                }
+                if (usage.getCompletionTokens() != null) {
+                    completionTokens = usage.getCompletionTokens().intValue();
+                }
+            }
+            if (promptTokens == 0 && completionTokens == 0) {
+                promptTokens = Math.max(prompt.length() / 4, 100);
+                completionTokens = Math.max(response.length() / 4, 100);
+            }
 
             String title = docNames.isEmpty() ? "Workspace Knowledge Quiz" : docNames.get(0) + (docNames.size() > 1 ? " & more" : "") + " Quiz";
 
@@ -219,15 +237,33 @@ public class StudyDeckService {
                     ]
                     """.formatted(count, context);
 
-            var response = chatClient.prompt().user(prompt).call().content();
+            var chatResponse = chatClient.prompt().user(prompt).call().chatResponse();
+            String response = chatResponse != null && chatResponse.getResult() != null
+                    && chatResponse.getResult().getOutput() != null
+                            ? chatResponse.getResult().getOutput().getText()
+                            : "";
             List<FlashcardDto> cards = parseFlashcards(response);
 
             if (cards.isEmpty()) {
                 return getFallbackFlashcards(docNames);
             }
 
-            int promptTokens = Math.max(prompt.length() / 4, 100);
-            int completionTokens = Math.max(response.length() / 4, 100);
+            int promptTokens = 0;
+            int completionTokens = 0;
+            if (chatResponse != null && chatResponse.getMetadata() != null
+                    && chatResponse.getMetadata().getUsage() != null) {
+                var usage = chatResponse.getMetadata().getUsage();
+                if (usage.getPromptTokens() != null) {
+                    promptTokens = usage.getPromptTokens().intValue();
+                }
+                if (usage.getCompletionTokens() != null) {
+                    completionTokens = usage.getCompletionTokens().intValue();
+                }
+            }
+            if (promptTokens == 0 && completionTokens == 0) {
+                promptTokens = Math.max(prompt.length() / 4, 100);
+                completionTokens = Math.max(response.length() / 4, 100);
+            }
 
             String title = docNames.isEmpty() ? "Workspace Study Flashcards" : docNames.get(0) + " Flashcards";
 

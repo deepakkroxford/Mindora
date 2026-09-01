@@ -1,5 +1,8 @@
 package com.substring.docmind.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.substring.docmind.dto.DocumentChunkDto;
 import com.substring.docmind.dto.DocumentMetadataDto;
 import com.substring.docmind.dto.DocumentResponseDto;
 import com.substring.docmind.entity.DocumentMetadata;
@@ -21,9 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class DocumentMetadataService {
@@ -38,6 +39,7 @@ public class DocumentMetadataService {
     private final JdbcTemplate jdbcTemplate;
     private final SemanticCacheService semanticCacheService;
     private final RedisRateLimitingService redisRateLimitingService;
+    private final ObjectMapper objectMapper;
 
     public DocumentMetadataService(
             DocumentMetadataRepo documentMetadataRepo,
@@ -47,7 +49,8 @@ public class DocumentMetadataService {
             ModelMapper modelMapper,
             JdbcTemplate jdbcTemplate,
             SemanticCacheService semanticCacheService,
-            RedisRateLimitingService redisRateLimitingService) {
+            RedisRateLimitingService redisRateLimitingService,
+            ObjectMapper objectMapper) {
         this.documentMetadataRepo = documentMetadataRepo;
         this.parserService = parserService;
         this.ingestionService = ingestionService;
@@ -56,6 +59,7 @@ public class DocumentMetadataService {
         this.jdbcTemplate = jdbcTemplate;
         this.semanticCacheService = semanticCacheService;
         this.redisRateLimitingService = redisRateLimitingService;
+        this.objectMapper = objectMapper;
     }
 
     // method to upload and parse document
@@ -158,5 +162,65 @@ public class DocumentMetadataService {
 
         // Evict query caches associated with this document
         semanticCacheService.evictForDocument(id);
+    }
+
+    public List<DocumentChunkDto> getDocumentChunks(UUID documentId) {
+        DocumentMetadata documentMetadata = documentMetadataRepo.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document with given id not found !!"));
+
+        List<DocumentChunkDto> chunks = new ArrayList<>();
+        try {
+            String sql = "SELECT id, content, metadata FROM vector_store WHERE metadata->>'documentId' = ?";
+            chunks = jdbcTemplate.query(sql, (rs, rowNum) -> {
+                String idStr = rs.getString("id");
+                UUID id = null;
+                try {
+                    id = UUID.fromString(idStr);
+                } catch (Exception ignored) {}
+
+                String content = rs.getString("content");
+                String metaJson = rs.getString("metadata");
+
+                Map<String, Object> metaMap = new HashMap<>();
+                int pageNumber = 1;
+                int chunkIndex = rowNum + 1;
+
+                if (metaJson != null && !metaJson.isBlank()) {
+                    try {
+                        metaMap = objectMapper.readValue(metaJson, new TypeReference<Map<String, Object>>() {});
+                        if (metaMap.get("pageNumber") != null) {
+                            pageNumber = Integer.parseInt(metaMap.get("pageNumber").toString());
+                        } else if (metaMap.get("page") != null) {
+                            pageNumber = Integer.parseInt(metaMap.get("page").toString());
+                        }
+                        if (metaMap.get("chunkIndex") != null) {
+                            chunkIndex = Integer.parseInt(metaMap.get("chunkIndex").toString());
+                        }
+                    } catch (Exception e) {
+                        log.debug("Could not parse chunk metadata json: {}", e.getMessage());
+                    }
+                }
+
+                int charLength = content != null ? content.length() : 0;
+                int estimatedTokens = (int) Math.ceil(charLength / 4.0);
+
+                return DocumentChunkDto.builder()
+                        .id(id)
+                        .documentId(documentId)
+                        .chunkIndex(chunkIndex)
+                        .pageNumber(pageNumber)
+                        .content(content)
+                        .charLength(charLength)
+                        .estimatedTokens(estimatedTokens)
+                        .metadata(metaMap)
+                        .build();
+            }, documentId.toString());
+
+            chunks.sort(Comparator.comparingInt(DocumentChunkDto::getChunkIndex));
+        } catch (Exception e) {
+            log.error("Failed to query chunks for document {}: {}", documentId, e.getMessage());
+        }
+
+        return chunks;
     }
 }
