@@ -6,16 +6,16 @@ services:
     container_name: mindora-postgres
     restart: unless-stopped
     ports:
-      - "5434:5432"
+      - "${DB_HOST_PORT:-5434}:5432"
     environment:
-      POSTGRES_DB: mindora
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - ytpgdata:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres -d mindora" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-mindora}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -31,6 +31,50 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  backend:
+    image: kingamansingh/mindora-backend:latest
+    container_name: mindora-backend
+    restart: unless-stopped
+    ports:
+      - "9081:9081"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 9081
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_MAX_ACTIVE: ${REDIS_MAX_ACTIVE:-16}
+      REDIS_MAX_IDLE: ${REDIS_MAX_IDLE:-8}
+      REDIS_MIN_IDLE: ${REDIS_MIN_IDLE:-2}
+      TZ: Asia/Kolkata
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend/docmind-frontend
+      dockerfile: Dockerfile
+    image: kingamansingh/mindora-frontend:latest
+    container_name: mindora-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      - backend
 
 volumes:
   ytpgdata:

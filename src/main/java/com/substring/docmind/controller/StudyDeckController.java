@@ -23,9 +23,11 @@ public class StudyDeckController {
     @PostMapping("/quiz")
     @Operation(summary = "Generate interactive multiple-choice quiz for selected document(s)")
     public ResponseEntity<ApiResponse<QuizResponseDto>> generateQuiz(
-            @RequestBody QuizGenerationRequestDto request) {
+            @RequestBody QuizGenerationRequestDto request,
+            java.security.Principal principal) {
 
-        QuizResponseDto quiz = studyDeckService.generateQuiz(request);
+        String userEmail = principal != null ? principal.getName() : null;
+        QuizResponseDto quiz = studyDeckService.generateQuiz(request, userEmail);
 
         return ResponseEntity.ok(
                 ApiResponse.<QuizResponseDto>builder()
@@ -40,9 +42,11 @@ public class StudyDeckController {
     @PostMapping("/flashcards")
     @Operation(summary = "Generate interactive study flashcards for selected document(s)")
     public ResponseEntity<ApiResponse<FlashcardDeckResponseDto>> generateFlashcards(
-            @RequestBody QuizGenerationRequestDto request) {
+            @RequestBody QuizGenerationRequestDto request,
+            java.security.Principal principal) {
 
-        FlashcardDeckResponseDto deck = studyDeckService.generateFlashcards(request);
+        String userEmail = principal != null ? principal.getName() : null;
+        FlashcardDeckResponseDto deck = studyDeckService.generateFlashcards(request, userEmail);
 
         return ResponseEntity.ok(
                 ApiResponse.<FlashcardDeckResponseDto>builder()

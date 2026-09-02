@@ -31,7 +31,7 @@
 		<lombok.version>1.18.36</lombok.version>
 		<spring-ai.version>2.0.0</spring-ai.version>
 		<springdoc.version>3.1.0</springdoc.version>
-
+		<docker.username>kingamansingh</docker.username>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -163,6 +163,15 @@
 	</dependencyManagement>
 
 	<build>
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+				<filtering>false</filtering>
+				<excludes>
+					<exclude>**/.env*</exclude>
+				</excludes>
+			</resource>
+		</resources>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
@@ -189,7 +198,72 @@
 					</annotationProcessorPaths>
 				</configuration>
 			</plugin>
+			<!-- Google Jib: Builds optimized Docker images & pushes to Docker Hub without needing a Dockerfile -->
+			<plugin>
+				<groupId>com.google.cloud.tools</groupId>
+				<artifactId>jib-maven-plugin</artifactId>
+				<version>3.4.4</version>
+				<configuration>
+					<from>
+						<image>eclipse-temurin:21-jre-alpine</image>
+					</from>
+					<to>
+						<image>docker.io/${docker.username}/mindora-backend</image>
+						<tags>
+							<tag>latest</tag>
+						</tags>
+					</to>
+					<container>
+						<jvmFlags>
+							<jvmFlag>-XX:+UseG1GC</jvmFlag>
+							<jvmFlag>-XX:MaxRAMPercentage=75.0</jvmFlag>
+							<jvmFlag>-Duser.timezone=Asia/Kolkata</jvmFlag>
+						</jvmFlags>
+						<ports>
+							<port>9081</port>
+						</ports>
+						<creationTime>USE_CURRENT_TIMESTAMP</creationTime>
+					</container>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<profile>
+			<id>docker</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-clean-plugin</artifactId>
+						<version>3.5.0</version>
+						<executions>
+							<execution>
+								<id>clean-dev-resources-for-docker</id>
+								<phase>process-resources</phase>
+								<goals>
+									<goal>clean</goal>
+								</goals>
+								<configuration>
+									<excludeDefaultDirectories>true</excludeDefaultDirectories>
+									<filesets>
+										<fileset>
+											<directory>${project.build.outputDirectory}</directory>
+											<includes>
+												<include>application-dev.*</include>
+												<include>application-uat.*</include>
+												<include>**/.env*</include>
+											</includes>
+										</fileset>
+									</filesets>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 
 </project>

@@ -19,6 +19,10 @@ public class DocumentMetadata {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
     @Column(unique = false)
     private  String filename;
 

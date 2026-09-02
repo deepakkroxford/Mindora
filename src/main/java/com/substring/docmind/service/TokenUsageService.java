@@ -24,6 +24,7 @@ public class TokenUsageService {
 
     private final TokenUsageEventRepository tokenRepository;
     private final UserRepository userRepository;
+    private final com.substring.docmind.repository.DocumentMetadataRepo documentMetadataRepo;
     private final JdbcTemplate jdbcTemplate;
 
     // Blended OpenAI GPT-4o-mini pricing ($0.15 / 1M prompt, $0.60 / 1M completion)
@@ -34,9 +35,11 @@ public class TokenUsageService {
     public TokenUsageService(
             TokenUsageEventRepository tokenRepository,
             UserRepository userRepository,
+            com.substring.docmind.repository.DocumentMetadataRepo documentMetadataRepo,
             JdbcTemplate jdbcTemplate) {
         this.tokenRepository = tokenRepository;
         this.userRepository = userRepository;
+        this.documentMetadataRepo = documentMetadataRepo;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -56,6 +59,31 @@ public class TokenUsageService {
             int total = promptTokens + completionTokens;
             if (total <= 0) return;
 
+            // Automatic owner resolution if userId was not explicitly passed
+            if (userId == null && documentId != null) {
+                try {
+                    userId = documentMetadataRepo.findById(documentId)
+                            .map(d -> d.getUser() != null ? d.getUser().getId() : null)
+                            .orElse(null);
+                } catch (Exception ignore) {}
+            }
+            if (userId == null && org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication() != null) {
+                String authName = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+                if (authName != null && !authName.isBlank() && !"anonymous".equalsIgnoreCase(authName) && !"anonymousUser".equalsIgnoreCase(authName)) {
+                    userId = userRepository.findByEmail(authName).map(User::getId).orElse(null);
+                }
+            }
+
+            String safeDocName = documentName != null ? documentName : "Document";
+            if (safeDocName.length() > 250) {
+                safeDocName = safeDocName.substring(0, 247) + "...";
+            }
+
+            String safeDesc = description != null ? description : "";
+            if (safeDesc.length() > 490) {
+                safeDesc = safeDesc.substring(0, 487) + "...";
+            }
+
             TokenUsageEvent event = TokenUsageEvent.builder()
                     .userId(userId)
                     .category(category != null ? category.toUpperCase() : "CHAT")
@@ -63,14 +91,14 @@ public class TokenUsageService {
                     .completionTokens(completionTokens)
                     .totalTokens(total)
                     .documentId(documentId)
-                    .documentName(documentName != null ? documentName : "Document")
-                    .description(description)
+                    .documentName(safeDocName)
+                    .description(safeDesc)
                     .build();
 
             tokenRepository.save(event);
-            log.debug("Recorded token usage event: category={}, totalTokens={}", category, total);
+            log.info("Recorded token usage event: user={}, category={}, totalTokens={}", userId, category, total);
         } catch (Exception e) {
-            log.warn("Failed to record token usage event: {}", e.getMessage());
+            log.warn("Failed to record token usage event: {}", e.getMessage(), e);
         }
     }
 
@@ -80,42 +108,18 @@ public class TokenUsageService {
     public TokenAnalyticsDto getTokenAnalytics(String email, Integer days) {
         UUID userId = resolveUserId(email);
         int dayWindow = (days != null && days > 0) ? days : 30;
+        if (userId == null) {
+            return buildEmptyAnalytics(dayWindow);
+        }
         LocalDateTime since = LocalDateTime.now().minusDays(dayWindow);
 
-        // Fetch all unified token events
+        // Fetch all unified token events (Single source of truth)
         List<TokenUsageEvent> events = tokenRepository.findRecentEvents(userId, since);
 
-        List<TokenEventDto> allEvents = new ArrayList<>();
-        Set<UUID> seenIds = new HashSet<>();
-
-        for (TokenUsageEvent e : events) {
-            allEvents.add(mapToDto(e));
-            if (e.getId() != null) seenIds.add(e.getId());
-        }
-
-        // Always supplement with historical chat_messages, mind_map_records, and quiz_attempts
-        for (TokenEventDto ch : fetchHistoricalChatTokens(userId, since)) {
-            if (ch.getId() != null && !seenIds.contains(ch.getId())) {
-                allEvents.add(ch);
-                seenIds.add(ch.getId());
-            }
-        }
-
-        for (TokenEventDto mm : fetchHistoricalMindMapTokens(userId, since)) {
-            if (mm.getId() != null && !seenIds.contains(mm.getId())) {
-                allEvents.add(mm);
-                seenIds.add(mm.getId());
-            }
-        }
-
-        for (TokenEventDto qz : fetchHistoricalQuizTokens(userId, since)) {
-            if (qz.getId() != null && !seenIds.contains(qz.getId())) {
-                allEvents.add(qz);
-                seenIds.add(qz.getId());
-            }
-        }
-
-        allEvents.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+        List<TokenEventDto> allEvents = events.stream()
+                .map(this::mapToDto)
+                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+                .collect(Collectors.toList());
 
         // Aggregate statistics
         long totalTokensPeriod = allEvents.stream().mapToLong(TokenEventDto::getTotalTokens).sum();
@@ -287,88 +291,29 @@ public class TokenUsageService {
                 .build();
     }
 
-    private List<TokenEventDto> fetchHistoricalChatTokens(UUID userId, LocalDateTime since) {
-        try {
-            String sql = "SELECT id, question, prompt_tokens, completion_tokens, total_tokens, created_at, document_id FROM chat_messages WHERE created_at >= ? ORDER BY created_at DESC";
-            return jdbcTemplate.query(sql, (rs, rowNum) -> {
-                int p = rs.getInt("prompt_tokens");
-                int c = rs.getInt("completion_tokens");
-                int t = rs.getInt("total_tokens");
-                if (t <= 0) t = p + c;
-                double cost = (p * PROMPT_COST_PER_TOKEN) + (c * COMPLETION_COST_PER_TOKEN);
-
-                return TokenEventDto.builder()
-                        .id(rs.getObject("id", UUID.class))
-                        .category("CHAT")
-                        .promptTokens(p)
-                        .completionTokens(c)
-                        .totalTokens(t)
-                        .description(rs.getString("question"))
-                        .estimatedCost(cost > 0 ? cost : t * BLENDED_COST_PER_TOKEN)
-                        .createdAt(rs.getTimestamp("created_at").toLocalDateTime())
-                        .build();
-            }, since);
-        } catch (Exception e) {
-            log.debug("Historical chat tokens query: {}", e.getMessage());
-            return Collections.emptyList();
+    private TokenAnalyticsDto buildEmptyAnalytics(int dayWindow) {
+        Map<String, TokenCategorySummaryDto> categoryMap = new LinkedHashMap<>();
+        for (String cat : List.of("CHAT", "MINDMAP", "QUIZ")) {
+            categoryMap.put(cat, TokenCategorySummaryDto.builder()
+                    .category(cat)
+                    .totalTokens(0)
+                    .requestCount(0)
+                    .promptTokens(0)
+                    .completionTokens(0)
+                    .estimatedCost(0.0)
+                    .percentage(0.0)
+                    .build());
         }
-    }
-
-    private List<TokenEventDto> fetchHistoricalMindMapTokens(UUID userId, LocalDateTime since) {
-        try {
-            String sql = "SELECT id, title, document_names, tokens_used, created_at FROM mindmap_records WHERE created_at >= ? ORDER BY created_at DESC";
-            return jdbcTemplate.query(sql, (rs, rowNum) -> {
-                int t = rs.getInt("tokens_used");
-                if (t <= 0) t = 1200;
-                int p = (int) (t * 0.7);
-                int c = (int) (t * 0.3);
-                double cost = (p * PROMPT_COST_PER_TOKEN) + (c * COMPLETION_COST_PER_TOKEN);
-
-                return TokenEventDto.builder()
-                        .id(rs.getObject("id", UUID.class))
-                        .category("MINDMAP")
-                        .promptTokens(p)
-                        .completionTokens(c)
-                        .totalTokens(t)
-                        .documentName(rs.getString("document_names"))
-                        .description("Mind Map: " + rs.getString("title"))
-                        .estimatedCost(cost > 0 ? cost : t * BLENDED_COST_PER_TOKEN)
-                        .createdAt(rs.getTimestamp("created_at").toLocalDateTime())
-                        .build();
-            }, since);
-        } catch (Exception e) {
-            log.debug("Historical mind map tokens query: {}", e.getMessage());
-            return Collections.emptyList();
-        }
-    }
-
-    private List<TokenEventDto> fetchHistoricalQuizTokens(UUID userId, LocalDateTime since) {
-        try {
-            String sql = "SELECT id, quiz_title, document_names, total_questions, created_at FROM quiz_attempts WHERE created_at >= ? ORDER BY created_at DESC";
-            return jdbcTemplate.query(sql, (rs, rowNum) -> {
-                int qCount = rs.getInt("total_questions");
-                if (qCount <= 0) qCount = 5;
-                int promptT = 450 + (qCount * 40);
-                int compT = qCount * 120;
-                int total = promptT + compT;
-                double cost = (promptT * PROMPT_COST_PER_TOKEN) + (compT * COMPLETION_COST_PER_TOKEN);
-
-                return TokenEventDto.builder()
-                        .id(rs.getObject("id", UUID.class))
-                        .category("QUIZ")
-                        .promptTokens(promptT)
-                        .completionTokens(compT)
-                        .totalTokens(total)
-                        .documentName(rs.getString("document_names"))
-                        .description("AI Quiz: " + rs.getString("quiz_title"))
-                        .estimatedCost(cost > 0 ? cost : total * BLENDED_COST_PER_TOKEN)
-                        .createdAt(rs.getTimestamp("created_at").toLocalDateTime())
-                        .build();
-            }, since);
-        } catch (Exception e) {
-            log.debug("Historical quiz tokens query: {}", e.getMessage());
-            return Collections.emptyList();
-        }
+        return TokenAnalyticsDto.builder()
+                .totalTokensAllTime(0L)
+                .totalTokensPeriod(0L)
+                .totalEstimatedCost(0.0)
+                .totalOperations(0L)
+                .dailyAverageTokens(0.0)
+                .categoryBreakdown(categoryMap)
+                .dailyUsage(buildDailyTimeSeries(Collections.emptyList(), dayWindow))
+                .recentEvents(Collections.emptyList())
+                .build();
     }
 
     private UUID resolveUserId(String email) {

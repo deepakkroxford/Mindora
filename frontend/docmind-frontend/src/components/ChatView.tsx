@@ -7,7 +7,7 @@ import {
   Download, FileCode, Edit2, ShieldAlert, Mic, MicOff, Volume2, VolumeX,
   ExternalLink, GraduationCap, Image as ImageIcon,
 } from 'lucide-react';
-import { chatApi, diagramApi } from '../services/api';
+import { chatApi, diagramApi, API_V1_URL } from '../services/api';
 import { useApp } from '../context/AppContext';
 import type { Message, CitationDto, DocumentDiagramDto } from '../types';
 import { clsx } from 'clsx';
@@ -627,10 +627,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                       message.similarityScore >= 0.8
                         ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20'
                         : message.similarityScore >= 0.68
-                        ? 'text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-500/10 border-cyan-200 dark:border-cyan-500/20'
-                        : message.similarityScore >= 0.58
-                        ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20'
-                        : 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border-amber-200 dark:border-amber-500/30'
+                          ? 'text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-500/10 border-cyan-200 dark:border-cyan-500/20'
+                          : message.similarityScore >= 0.58
+                            ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20'
+                            : 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border-amber-200 dark:border-amber-500/30'
                     )}
                     title={message.similarityScore < 0.58 ? 'Guardrail Active: Low document similarity (<58%)' : `Hybrid Vector Match: ${(message.similarityScore * 100).toFixed(1)}%`}
                   >
@@ -1004,7 +1004,7 @@ const ChatView: React.FC = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/v1/chat/stream', {
+      const response = await fetch(`${API_V1_URL}/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1087,7 +1087,7 @@ const ChatView: React.FC = () => {
               prev.map((m) => m.id === msgId ? { ...m, diagrams: dRes.data } : m)
             );
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       // Refresh conversation list and maintain conversationId for conversational memory
@@ -1168,7 +1168,7 @@ const ChatView: React.FC = () => {
               prev.map((m) => m.id === assistantMsgId ? { ...m, suggestedQuestions: sugRes.data } : m)
             );
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
@@ -1740,10 +1740,10 @@ const ChatView: React.FC = () => {
                   isBusy
                     ? 'Mindora is generating response…'
                     : selectedDocumentIds.length === 1 && selectedDoc
-                    ? `Ask anything about "${selectedDoc.filename}"…`
-                    : selectedDocumentIds.length > 1
-                    ? `Ask questions across ${selectedDocumentIds.length} scoped documents…`
-                    : 'Ask any question across your document base…'
+                      ? `Ask anything about "${selectedDoc.filename}"…`
+                      : selectedDocumentIds.length > 1
+                        ? `Ask questions across ${selectedDocumentIds.length} scoped documents…`
+                        : 'Ask any question across your document base…'
                 }
                 rows={1}
                 disabled={isBusy}

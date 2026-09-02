@@ -15,9 +15,20 @@ public interface TokenUsageEventRepository extends JpaRepository<TokenUsageEvent
 
     List<TokenUsageEvent> findByUserIdOrderByCreatedAtDesc(UUID userId);
 
-    @Query("SELECT e FROM TokenUsageEvent e WHERE (:userId IS NULL OR e.userId = :userId) AND e.createdAt >= :since ORDER BY e.createdAt DESC")
+    @Query("""
+        SELECT e FROM TokenUsageEvent e 
+        WHERE (e.userId = :userId OR (e.userId IS NULL AND e.documentId IN (SELECT d.id FROM DocumentMetadata d WHERE d.user.id = :userId))) 
+          AND e.createdAt >= :since 
+        ORDER BY e.createdAt DESC
+    """)
     List<TokenUsageEvent> findRecentEvents(@Param("userId") UUID userId, @Param("since") LocalDateTime since);
 
-    @Query("SELECT e.category, SUM(e.totalTokens), COUNT(e), SUM(e.promptTokens), SUM(e.completionTokens) FROM TokenUsageEvent e WHERE (:userId IS NULL OR e.userId = :userId) AND e.createdAt >= :since GROUP BY e.category")
+    @Query("""
+        SELECT e.category, SUM(e.totalTokens), COUNT(e), SUM(e.promptTokens), SUM(e.completionTokens) 
+        FROM TokenUsageEvent e 
+        WHERE (e.userId = :userId OR (e.userId IS NULL AND e.documentId IN (SELECT d.id FROM DocumentMetadata d WHERE d.user.id = :userId))) 
+          AND e.createdAt >= :since 
+        GROUP BY e.category
+    """)
     List<Object[]> findCategoryAggregates(@Param("userId") UUID userId, @Param("since") LocalDateTime since);
 }

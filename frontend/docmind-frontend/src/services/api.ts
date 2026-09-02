@@ -27,8 +27,11 @@ import type {
   TokenAnalyticsDto,
 } from '../types';
 
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+export const API_V1_URL = API_BASE_URL ? `${API_BASE_URL}/api/v1` : '/api/v1';
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: API_V1_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -258,7 +261,7 @@ export const analyticsApi = {
   },
 
   exportCsvUrl: (days: number = 30): string => {
-    return `/api/v1/analytics/tokens/export?days=${days}`;
+    return `${API_V1_URL}/analytics/tokens/export?days=${days}`;
   },
 };
 

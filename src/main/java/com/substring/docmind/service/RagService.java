@@ -39,6 +39,7 @@ public class RagService {
     private final ChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
     private final DocumentDiagramRepository documentDiagramRepository;
+    private final DocumentMetadataRepo documentMetadataRepo;
     private final TokenUsageService tokenUsageService;
     private final PlatformTransactionManager transactionManager;
     private final JdbcTemplate jdbcTemplate;
@@ -54,6 +55,7 @@ public class RagService {
             ChatMessageRepository chatMessageRepository,
             UserRepository userRepository,
             DocumentDiagramRepository documentDiagramRepository,
+            DocumentMetadataRepo documentMetadataRepo,
             TokenUsageService tokenUsageService,
             PlatformTransactionManager transactionManager,
             JdbcTemplate jdbcTemplate,
@@ -67,6 +69,7 @@ public class RagService {
         this.chatMessageRepository = chatMessageRepository;
         this.userRepository = userRepository;
         this.documentDiagramRepository = documentDiagramRepository;
+        this.documentMetadataRepo = documentMetadataRepo;
         this.tokenUsageService = tokenUsageService;
         this.transactionManager = transactionManager;
         this.jdbcTemplate = jdbcTemplate;
@@ -558,14 +561,17 @@ public class RagService {
         }
 
         sb.append("Current User Message / Question: ").append(question).append("\n\n");
-        sb.append("Instructions:\n");
-        sb.append(
-                "- Pay attention to the recent conversation history to understand context, follow-up questions, pronouns, and previous dialogue.\n");
+        sb.append("Instructions & Output Format:\n");
+        sb.append("- Pay attention to the recent conversation history to understand context, follow-up questions, pronouns, and previous dialogue.\n");
         if (contextText != null && !contextText.isBlank() && !isLowRelevance) {
-            sb.append(
-                    "- Since the question relates to the document context above, prioritize answering using that context and reference key sections or data.\n");
+            sb.append("- Prioritize and ground your answer using the provided Document Context, citing key concepts, metrics, and parameters.\n");
         }
-        sb.append("- Respond helpfully, accurately, and conversationally using your broad knowledge base.\n");
+        sb.append("- Structure your response with rich, professional Markdown:\n");
+        sb.append("  • Use descriptive section headings with badges/emojis (e.g., ### 📌 Core Concept / Overview, ### 🏗️ Architecture & Mechanism, ### ⚙️ How It Works in Practice, ### 💡 Key Takeaways & Best Practices).\n");
+        sb.append("  • Bold important technical terms, components, and parameter values.\n");
+        sb.append("  • Use structured bullet points and numbered steps for processes.\n");
+        sb.append("  • If you include a table, always provide introductory context before it and an analytical summary/takeaway after it. Never return a bare table without explanation.\n");
+        sb.append("- Provide deep, articulate, and actionable insights that thoroughly answer the user's intent.\n");
 
         return sb.toString();
     }
@@ -736,7 +742,23 @@ public class RagService {
         double effectiveSimilarity = (similaritySearch != null) ? similaritySearch
                 : appProperties.getRag().getSimilarityThreshold();
 
-        final List<UUID> scopedDocIds = documentIds != null ? documentIds : Collections.emptyList();
+        List<UUID> resolvedDocIds = documentIds != null ? new ArrayList<>(documentIds) : new ArrayList<>();
+        if (resolvedDocIds.isEmpty()) {
+            String email = SecurityContextHolder.getContext().getAuthentication() != null
+                    ? SecurityContextHolder.getContext().getAuthentication().getName()
+                    : null;
+            if (email != null && !email.isBlank() && !"anonymousUser".equals(email) && !"anonymous".equals(email)) {
+                User user = userRepository.findByEmail(email).orElse(null);
+                if (user != null) {
+                    List<UUID> userDocIds = documentMetadataRepo.findByUserOrderByCreatedAtDesc(user)
+                            .stream().map(DocumentMetadata::getId).toList();
+                    if (!userDocIds.isEmpty()) {
+                        resolvedDocIds.addAll(userDocIds);
+                    }
+                }
+            }
+        }
+        final List<UUID> scopedDocIds = Collections.unmodifiableList(resolvedDocIds);
 
         // If the user scoped document(s) and requested a summary/overview/comparison,
         // load chunks directly

@@ -57,9 +57,30 @@ public class StudyDeckService {
     }
 
     /**
+    /**
+     * Helper to resolve authenticated User UUID.
+     */
+    private UUID resolveUserId(String userEmail) {
+        if (userEmail != null && !userEmail.isBlank() && !"anonymous".equalsIgnoreCase(userEmail) && !"anonymousUser".equalsIgnoreCase(userEmail)) {
+            return userRepository.findByEmail(userEmail).map(User::getId).orElse(null);
+        }
+        if (org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication() != null) {
+            String authName = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+            if (authName != null && !authName.isBlank() && !"anonymous".equalsIgnoreCase(authName) && !"anonymousUser".equalsIgnoreCase(authName)) {
+                return userRepository.findByEmail(authName).map(User::getId).orElse(null);
+            }
+        }
+        return null;
+    }
+
+    public QuizResponseDto generateQuiz(QuizGenerationRequestDto request) {
+        return generateQuiz(request, null);
+    }
+
+    /**
      * Generates or retrieves an interactive multiple-choice quiz based on selected document(s).
      */
-    public QuizResponseDto generateQuiz(QuizGenerationRequestDto request) {
+    public QuizResponseDto generateQuiz(QuizGenerationRequestDto request, String userEmail) {
         List<UUID> docIds = request.getDocumentIds() != null ? request.getDocumentIds() : Collections.emptyList();
         int count = Math.min(Math.max(request.getNumQuestions(), 3), 15);
         String difficulty = (request.getDifficulty() != null && !request.getDifficulty().isBlank())
@@ -150,8 +171,10 @@ public class StudyDeckService {
 
             String title = docNames.isEmpty() ? "Workspace Knowledge Quiz" : docNames.get(0) + (docNames.size() > 1 ? " & more" : "") + " Quiz";
 
+            UUID userId = resolveUserId(userEmail);
+
             tokenUsageService.recordEvent(
-                    null,
+                    userId,
                     "QUIZ",
                     promptTokens,
                     completionTokens,
@@ -183,10 +206,14 @@ public class StudyDeckService {
         }
     }
 
+    public FlashcardDeckResponseDto generateFlashcards(QuizGenerationRequestDto request) {
+        return generateFlashcards(request, null);
+    }
+
     /**
      * Generates or retrieves interactive study flashcards based on selected document(s).
      */
-    public FlashcardDeckResponseDto generateFlashcards(QuizGenerationRequestDto request) {
+    public FlashcardDeckResponseDto generateFlashcards(QuizGenerationRequestDto request, String userEmail) {
         List<UUID> docIds = request.getDocumentIds() != null ? request.getDocumentIds() : Collections.emptyList();
         int count = Math.min(Math.max(request.getNumQuestions(), 4), 16);
 
@@ -267,8 +294,10 @@ public class StudyDeckService {
 
             String title = docNames.isEmpty() ? "Workspace Study Flashcards" : docNames.get(0) + " Flashcards";
 
+            UUID userId = resolveUserId(userEmail);
+
             tokenUsageService.recordEvent(
-                    null,
+                    userId,
                     "QUIZ",
                     promptTokens,
                     completionTokens,

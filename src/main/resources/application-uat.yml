@@ -1,0 +1,96 @@
+# ===================================================================
+# Mindora — UAT (User Acceptance Testing / Staging) Configuration
+# ===================================================================
+
+spring:
+  # PostgreSQL Datasource (Staging / UAT Database)
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5434}/${DB_NAME:mindora}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 30000
+      max-lifetime: 1800000
+
+  # Redis Distributed Cache & Rate Limiting (Staging / UAT)
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
+
+  # Hibernate & JPA
+  jpa:
+    hibernate:
+      ddl-auto: ${HIBERNATE_DDL_AUTO:update}
+    show-sql: ${SHOW_SQL:false}
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          batch_size: 25
+
+  # OpenAI / OpenRouter AI Models Configuration
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      base-url: ${OPENAI_BASE_URL}
+      chat:
+        model: ${OPENAI_CHAT_MODEL:openrouter/auto}
+        temperature: 0.2
+      embedding:
+        model: ${OPENAI_EMBEDDING_MODEL:openai/text-embedding-3-small}
+
+    # Vector Store with pgvector HNSW Index
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 1536
+        table-name: vector_store
+        schema-name: public
+        initialize-schema: true
+
+  # Email SMTP Service
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  # Multipart Document Uploads (Up to 25MB single file, 50MB batch)
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 50MB
+
+# Application RAG & CORS Configurations
+app:
+  rag:
+    chunk-size: 700
+    top-k: 5
+    similarity-threshold: 0.0
+
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:3001,https://mindora-uat.vercel.app}
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+    allowed-headers: "*"
+
+bootui:
+  enabled: ON

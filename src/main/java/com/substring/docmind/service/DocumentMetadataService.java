@@ -11,6 +11,8 @@ import com.substring.docmind.exception.DocumentProcessingException;
 import com.substring.docmind.exception.RateLimitExceededException;
 import com.substring.docmind.exception.ResourceNotFoundException;
 import com.substring.docmind.repository.DocumentMetadataRepo;
+import com.substring.docmind.entity.User;
+import com.substring.docmind.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
@@ -40,6 +42,7 @@ public class DocumentMetadataService {
     private final SemanticCacheService semanticCacheService;
     private final RedisRateLimitingService redisRateLimitingService;
     private final ObjectMapper objectMapper;
+    private final UserRepository userRepository;
 
     public DocumentMetadataService(
             DocumentMetadataRepo documentMetadataRepo,
@@ -50,7 +53,8 @@ public class DocumentMetadataService {
             JdbcTemplate jdbcTemplate,
             SemanticCacheService semanticCacheService,
             RedisRateLimitingService redisRateLimitingService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            UserRepository userRepository) {
         this.documentMetadataRepo = documentMetadataRepo;
         this.parserService = parserService;
         this.ingestionService = ingestionService;
@@ -60,6 +64,7 @@ public class DocumentMetadataService {
         this.semanticCacheService = semanticCacheService;
         this.redisRateLimitingService = redisRateLimitingService;
         this.objectMapper = objectMapper;
+        this.userRepository = userRepository;
     }
 
     // method to upload and parse document
@@ -70,7 +75,11 @@ public class DocumentMetadataService {
                 ? SecurityContextHolder.getContext().getAuthentication().getName()
                 : "anonymous";
 
-        if (!redisRateLimitingService.tryAcquireUpload(email)) {
+        User user = (email != null && !email.isBlank() && !"anonymous".equals(email) && !"anonymousUser".equals(email))
+                ? userRepository.findByEmail(email).orElse(null)
+                : null;
+
+        if (!redisRateLimitingService.tryAcquireUpload(email != null ? email : "anonymous")) {
             throw new RateLimitExceededException(
                     "⏳ You're uploading files too quickly! Please wait a minute before uploading more.");
         }
@@ -81,6 +90,7 @@ public class DocumentMetadataService {
         // document meta data create
         DocumentMetadata documentMetadata = DocumentMetadata
                 .builder()
+                .user(user)
                 .filename(fileName)
                 .contentType(contentType)
                 .status(DocumentStatus.UPLOADING)
@@ -127,10 +137,23 @@ public class DocumentMetadataService {
         return responseDtos;
     }
 
-    @Cacheable(value = "documents")
     public List<DocumentMetadataDto> getAllDocuments() {
-        log.debug("Fetching all documents from PostgreSQL (Cache miss)");
-        List<DocumentMetadata> allDocuments = documentMetadataRepo.findAllByOrderByCreatedAtDesc();
+        String email = SecurityContextHolder.getContext().getAuthentication() != null
+                ? SecurityContextHolder.getContext().getAuthentication().getName()
+                : null;
+
+        User user = (email != null && !email.isBlank() && !"anonymousUser".equals(email) && !"anonymous".equals(email))
+                ? userRepository.findByEmail(email).orElse(null)
+                : null;
+
+        log.debug("Fetching documents for user: {}", email);
+        List<DocumentMetadata> allDocuments;
+        if (user != null) {
+            allDocuments = documentMetadataRepo.findByUserOrderByCreatedAtDesc(user);
+        } else {
+            allDocuments = documentMetadataRepo.findAllByOrderByCreatedAtDesc();
+        }
+
         return allDocuments.stream()
                 .map(documentMetadata -> modelMapper.map(documentMetadata, DocumentMetadataDto.class))
                 .toList();

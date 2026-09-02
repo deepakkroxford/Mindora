@@ -1,0 +1,106 @@
+# ===================================================================
+# Mindora — Production Configuration (Used for Docker & Cloud Deployments)
+# ===================================================================
+
+server:
+  port: ${SERVER_PORT:${PORT:9081}}
+
+spring:
+  # PostgreSQL Datasource
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:mindora}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_MAX_POOL_SIZE:20}
+      minimum-idle: ${DB_MIN_IDLE:5}
+      idle-timeout: 300000
+      connection-timeout: 30000
+      max-lifetime: 1800000
+
+  # Mail / SMTP Server
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  # Hibernate & JPA
+  jpa:
+    hibernate:
+      ddl-auto: ${HIBERNATE_DDL_AUTO:update}
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          batch_size: 25
+
+  # OpenAI / OpenRouter AI Models
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      base-url: ${OPENAI_BASE_URL}
+      chat:
+        model: ${OPENAI_CHAT_MODEL:openrouter/auto}
+        temperature: ${OPENAI_TEMPERATURE:0.2}
+      embedding:
+        model: ${OPENAI_EMBEDDING_MODEL:openai/text-embedding-3-small}
+
+    # Vector Store with pgvector HNSW Index
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 1536
+        table-name: vector_store
+        schema-name: public
+        initialize-schema: true
+
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_SIZE:25MB}
+      max-request-size: ${MAX_REQUEST_SIZE:50MB}
+  
+  # Redis configurations
+  data:
+    redis:
+      host: redis
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: ${REDIS_MAX_ACTIVE:16}
+          max-idle: ${REDIS_MAX_IDLE:8}
+          min-idle: ${REDIS_MIN_IDLE:2}
+
+# App-specific Configurations
+app:
+  rag:
+    chunk-size: ${RAG_CHUNK_SIZE:700}
+    top-k: ${RAG_TOP_K:5}
+    similarity-threshold: ${RAG_SIMILARITY_THRESHOLD:0.0}
+  cache:
+    enabled: true
+    query-ttl-seconds: 7200
+    document-ttl-seconds: 1800
+  rate-limit:
+    enabled: true
+    chat-per-minute: 2
+    upload-per-minute: 10
+
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+    allowed-headers: "*"
+
+bootui:
+  enabled: OFF

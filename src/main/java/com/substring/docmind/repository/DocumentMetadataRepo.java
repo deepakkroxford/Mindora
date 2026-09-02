@@ -13,5 +13,11 @@ public interface DocumentMetadataRepo extends JpaRepository<DocumentMetadata, UU
 
     List<DocumentMetadata> findAllByOrderByCreatedAtDesc();
 
+    List<DocumentMetadata> findByUserOrderByCreatedAtDesc(com.substring.docmind.entity.User user);
+
+    List<DocumentMetadata> findByUserIdOrderByCreatedAtDesc(UUID userId);
+
+    java.util.Optional<DocumentMetadata> findByIdAndUser(UUID id, com.substring.docmind.entity.User user);
+
 
 }

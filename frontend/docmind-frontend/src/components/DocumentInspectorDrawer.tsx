@@ -5,7 +5,7 @@ import {
   ExternalLink, Database, RefreshCw, ShieldCheck, CheckCircle2, AlertCircle, ChevronRight,
   Filter, ArrowRight
 } from 'lucide-react';
-import { documentApi, diagramApi } from '../services/api';
+import { documentApi, diagramApi, API_V1_URL } from '../services/api';
 import { useApp } from '../context/AppContext';
 import type { DocumentChunkDto, DocumentDiagramDto } from '../types';
 import { DiagramLightboxModal } from './DiagramLightboxModal';
@@ -436,7 +436,7 @@ export const DocumentInspectorDrawer: React.FC = () => {
                     >
                       <div className="relative aspect-video bg-slate-950/90 flex items-center justify-center overflow-hidden">
                         <img
-                          src={`/api/v1/diagrams/${diag.id}/image`}
+                          src={`${API_V1_URL}/diagrams/${diag.id}/image`}
                           alt={`Extracted diagram page ${diag.pageNumber}`}
                           className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-300"
                           loading="lazy"
